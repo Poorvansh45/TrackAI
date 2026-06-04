@@ -13,8 +13,32 @@ import { QuizCard } from "@/components/dashboard/quiz-card"
 import { NotesCard } from "@/components/dashboard/notes-card"
 import { AIMentorCard } from "@/components/dashboard/ai-mentor-card"
 import { PlannerCard } from "@/components/dashboard/planner-card"
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
+
 
 export default function DashboardPage() {
+  const router = useRouter();
+  
+  const testProfile = async () => {
+  try {
+    const response = await api.get("/profile/me");
+
+    console.log("PROFILE:", response.data);
+  } catch (error) {
+    console.error("PROFILE ERROR:", error);
+  }
+};
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+    }
+  }, [router]);
+   
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />

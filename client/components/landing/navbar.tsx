@@ -65,7 +65,7 @@ export function Navbar() {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/dashboard">
+            <Link href="/login">
               <Button
                 variant="ghost"
                 className="text-[13px] text-foreground-muted hover:text-foreground h-8 px-3"
@@ -116,7 +116,7 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 pt-3 mt-2 border-t border-border">
-                <Link href="/dashboard">
+                <Link href="/login">
                   <Button variant="ghost" className="w-full justify-start text-[13px] h-8">
                     Log in
                   </Button>

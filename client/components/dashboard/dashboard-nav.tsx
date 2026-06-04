@@ -1,10 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Bell, Search, Settings } from "lucide-react"
+import { Bell, Search, Settings ,LogOut } from "lucide-react"
 
 export function DashboardNav() {
+    const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    window.location.href = "/login";
+  };
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border h-12 flex items-center px-4 lg:px-6">
       <div className="w-full flex items-center justify-between">
@@ -43,7 +48,13 @@ export function DashboardNav() {
           <button className="w-8 h-8 rounded-md hover:bg-surface-1 flex items-center justify-center border border-transparent hover:border-border/40 text-foreground-muted hover:text-foreground transition-all">
             <Settings className="w-4 h-4" />
           </button>
-
+            {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="w-8 h-8 rounded-md hover:bg-surface-1 flex items-center justify-center border border-transparent hover:border-border/40 text-foreground-muted hover:text-red-500 transition-all"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
           {/* Profile Avatar */}
           <div className="w-7 h-7 rounded-md bg-accent/20 flex items-center justify-center border border-accent/30 text-accent font-semibold text-mono text-[10px] cursor-pointer">
             JD
