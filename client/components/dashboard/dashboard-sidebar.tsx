@@ -10,15 +10,16 @@ import {
   BarChart3, 
   Settings,
   HelpCircle,
-  Brain
+  CalendarDays
 } from "lucide-react"
 
 const sidebarItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Roadmap", href: "/dashboard/roadmap", icon: Route },
-  { name: "Quizzes", href: "/dashboard/quiz", icon: Target },
-  { name: "Smart Notes", href: "/dashboard/notes", icon: FileText },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { name: "Dashboard",  href: "/dashboard",           icon: LayoutDashboard },
+  { name: "Roadmap",    href: "/dashboard/roadmap",   icon: Route },
+  { name: "Timeline",   href: "/dashboard/timeline",  icon: CalendarDays },
+  { name: "Quizzes",    href: "/dashboard/quiz",      icon: Target },
+  { name: "Smart Notes",href: "/dashboard/notes",     icon: FileText },
+  { name: "Analytics",  href: "/dashboard/analytics", icon: BarChart3 },
 ]
 
 export function DashboardSidebar() {

@@ -3,6 +3,7 @@ from typing import List, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SkillSync API"
     API_V1_STR: str = "/api/v1"
@@ -12,8 +13,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 11520  # 8 days
 
-    # Tracks AI — Gemini LLM
+    # Tracks AI — LLM keys
+    # Primary  : Gemini Flash Lite  (very cheap, high free quota)
+    # Fallback : Groq Llama 3       (completely free tier)
     GOOGLE_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
 
     BACKEND_CORS_ORIGINS: Union[List[str], str] = []
 
@@ -35,7 +39,8 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore",
     )
+
 
 settings = Settings()
