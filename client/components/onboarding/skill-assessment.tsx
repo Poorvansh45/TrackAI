@@ -3,36 +3,71 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowRight, Check, X, ShieldAlert } from "lucide-react"
+import { ArrowLeft, ArrowRight, Check, AlertCircle } from "lucide-react"
 
-const assessmentQuestions: Record<string, { id: string; question: string }[]> = {
+const assessmentQuestions: Record<string, { id: string; question: string; options: string[] }[]> = {
   "ai-ml": [
-    { id: "python", question: "Do you have experience with Python programming?" },
-    { id: "math", question: "Are you comfortable with linear algebra and calculus?" },
-    { id: "statistics", question: "Do you understand basic statistics and probability?" },
-    { id: "ml-basics", question: "Have you built any machine learning models before?" },
-    { id: "deep-learning", question: "Are you familiar with neural networks?" },
+    { id: "q1", question: "How comfortable are you with programming?", options: ["Never written code", "Know basic programming concepts", "Can write small Python programs", "Can build complete applications"] },
+    { id: "q2", question: "What is your Python experience?", options: ["Never used Python", "Know variables, loops and functions", "Used NumPy or Pandas", "Built Python projects"] },
+    { id: "q3", question: "How comfortable are you with mathematics?", options: ["Basic arithmetic only", "Algebra and equations", "Statistics and probability", "Linear algebra and calculus"] },
+    { id: "q4", question: "Have you worked with datasets before?", options: ["Never", "Excel or Google Sheets", "Python Pandas", "Large datasets and data pipelines"] },
+    { id: "q5", question: "Which best describes your ML knowledge?", options: ["No ML knowledge", "Understand ML concepts", "Trained ML models", "Built and deployed ML projects"] }
   ],
   "fullstack": [
-    { id: "html-css", question: "Do you know HTML and CSS?" },
-    { id: "javascript", question: "Are you comfortable with JavaScript?" },
-    { id: "frameworks", question: "Have you used any frontend frameworks (React, Vue, etc.)?" },
-    { id: "backend", question: "Have you built backend APIs before?" },
-    { id: "databases", question: "Do you have experience with databases?" },
+    { id: "q1", question: "What is your programming experience?", options: ["No experience", "Basic syntax and logic", "Comfortable coding", "Built projects"] },
+    { id: "q2", question: "What is your frontend experience?", options: ["None", "HTML and CSS", "JavaScript", "React, Vue or Angular"] },
+    { id: "q3", question: "What is your backend experience?", options: ["None", "Basic APIs", "CRUD applications", "Production backend systems"] },
+    { id: "q4", question: "What is your database experience?", options: ["None", "Basic SQL", "Designed databases", "Worked on production databases"] },
+    { id: "q5", question: "Have you deployed websites or applications?", options: ["Never", "Localhost only", "Vercel, Netlify or Render", "Cloud deployment with CI/CD"] }
+  ],
+  "data-science": [
+    { id: "q1", question: "What is your Python Experience?", options: ["Never used Python", "Basic Python", "Python with libraries", "Built projects"] },
+    { id: "q2", question: "What is your Statistics Knowledge?", options: ["None", "Basic statistics", "Probability and distributions", "Advanced statistics"] },
+    { id: "q3", question: "What is your Data Analysis Experience?", options: ["Never", "Excel", "Pandas", "Professional projects"] },
+    { id: "q4", question: "What is your Visualization Experience?", options: ["Never", "Excel charts", "Matplotlib or Seaborn", "Dashboards and BI tools"] },
+    { id: "q5", question: "What is your Real Dataset Experience?", options: ["Never", "Small datasets", "Kaggle datasets", "Industry-scale datasets"] }
+  ],
+  "dsa": [
+    { id: "q1", question: "What is your Programming Skill?", options: ["Never coded", "Basic coding", "Comfortable coding", "Strong coding skills"] },
+    { id: "q2", question: "What is your experience with Arrays and Loops?", options: ["Don't know", "Basic understanding", "Comfortable", "Very confident"] },
+    { id: "q3", question: "What is your experience with Functions and Recursion?", options: ["Don't know", "Functions only", "Basic recursion", "Comfortable recursion"] },
+    { id: "q4", question: "How many Coding Problems Solved?", options: ["0", "1-50", "50-200", "200+"] },
+    { id: "q5", question: "What is your Competitive Programming Experience?", options: ["None", "Beginner", "Intermediate", "Advanced"] }
+  ],
+  "devops": [
+    { id: "q1", question: "What is your Linux Knowledge?", options: ["None", "Basic usage", "Comfortable", "Daily user"] },
+    { id: "q2", question: "What is your Command Line Experience?", options: ["Never used", "Basic commands", "Daily usage", "Advanced scripting"] },
+    { id: "q3", question: "What is your Git Experience?", options: ["Never used Git", "Basic Git", "Branching and merging", "Team collaboration workflows"] },
+    { id: "q4", question: "What is your Cloud Experience?", options: ["None", "Familiar with AWS/Azure/GCP", "Used cloud services", "Deployed applications on cloud"] },
+    { id: "q5", question: "What is your Deployment Experience?", options: ["Never", "Static websites", "Full applications", "Production systems"] }
+  ],
+  "trading": [
+    { id: "q1", question: "What is your Market Knowledge?", options: ["Complete beginner", "Know basic market terms", "Understand technical analysis", "Active trader"] },
+    { id: "q2", question: "What is your experience with Chart Reading?", options: ["Never used charts", "Basic chart reading", "Regular chart analysis", "Advanced price action analysis"] },
+    { id: "q3", question: "What is your knowledge of Risk Management?", options: ["No knowledge", "Basic stop-loss understanding", "Position sizing knowledge", "Advanced risk management"] },
+    { id: "q4", question: "What is your Trading Experience?", options: ["None", "Less than 6 months", "6 months to 2 years", "More than 2 years"] },
+    { id: "q5", question: "Do you maintain a Trading Journal?", options: ["Never maintained one", "Occasionally", "Consistently", "Detailed performance tracking"] }
+  ],
+  "cybersecurity": [
+    { id: "q1", question: "What is your Networking Knowledge?", options: ["None", "Basic internet concepts", "Understand TCP/IP", "Strong networking knowledge"] },
+    { id: "q2", question: "What is your Operating System Experience?", options: ["Basic user", "Power user", "Linux familiar", "Linux comfortable"] },
+    { id: "q3", question: "What is your Programming Knowledge?", options: ["None", "Basic", "Intermediate", "Advanced"] },
+    { id: "q4", question: "What is your Security Knowledge?", options: ["None", "Common threats awareness", "Security fundamentals", "Practical security experience"] },
+    { id: "q5", question: "What is your Hands-on Experience?", options: ["None", "Labs and tutorials", "CTF challenges", "Real security projects"] }
   ],
   "default": [
-    { id: "basics", question: "Do you have any prior experience in this field?" },
-    { id: "projects", question: "Have you built any projects before?" },
-    { id: "theory", question: "Are you familiar with the theoretical concepts?" },
-    { id: "tools", question: "Have you used industry-standard tools?" },
-    { id: "advanced", question: "Are you ready for advanced topics?" },
-  ],
+    { id: "q1", question: "What is your experience in this field?", options: ["None", "Basic", "Intermediate", "Advanced"] },
+    { id: "q2", question: "Have you built projects related to this?", options: ["No projects", "Small scripts", "Academic projects", "Production applications"] },
+    { id: "q3", question: "How comfortable are you with the tools?", options: ["Never used", "Familiar", "Comfortable", "Expert"] },
+    { id: "q4", question: "What is your theoretical knowledge?", options: ["None", "Basic concepts", "Strong understanding", "Deep expertise"] },
+    { id: "q5", question: "What is your main goal for this track?", options: ["Exploration", "Job preparation", "Skill enhancement", "Mastery"] }
+  ]
 }
 
 interface SkillAssessmentProps {
   selectedSkill: string | null
-  answers: Record<string, boolean>
-  onAnswer: (answers: Record<string, boolean>) => void
+  answers: Record<string, string>
+  onAnswer: (answers: Record<string, string>) => void
   onNext: () => void
   onBack: () => void
 }
@@ -44,8 +79,8 @@ export function SkillAssessment({ selectedSkill, answers, onAnswer, onNext, onBa
   const currentQ = questions[currentQuestion]
   const isComplete = currentQuestion >= questions.length
 
-  const handleAnswer = (answer: boolean) => {
-    const newAnswers = { ...answers, [currentQ.id]: answer }
+  const handleAnswer = (answer: string) => {
+    const newAnswers = { ...answers, [currentQ.question]: answer }
     onAnswer(newAnswers)
     
     if (currentQuestion < questions.length - 1) {
@@ -92,12 +127,12 @@ export function SkillAssessment({ selectedSkill, answers, onAnswer, onNext, onBa
         <div className="mb-8">
           <div className="flex justify-between text-mono text-[10px] text-foreground-subtle mb-1.5">
             <span>Question {Math.min(currentQuestion + 1, questions.length)} of {questions.length}</span>
-            <span>{completionPercentage}% complete</span>
+            <span>{Math.min(completionPercentage, 100)}% complete</span>
           </div>
           <div className="h-1 bg-surface-2 rounded-full overflow-hidden border border-border/20">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(answeredCount / questions.length) * 100}%` }}
+              animate={{ width: `${Math.min((answeredCount / questions.length) * 100, 100)}%` }}
               transition={{ duration: 0.2 }}
               className="h-full bg-accent rounded-full"
             />
@@ -119,19 +154,16 @@ export function SkillAssessment({ selectedSkill, answers, onAnswer, onNext, onBa
                 {currentQ.question}
               </p>
 
-              <div className="flex justify-center gap-3">
-                <Button
-                  onClick={() => handleAnswer(false)}
-                  className="bg-surface-2 hover:bg-surface-3 border border-border text-foreground-muted hover:text-foreground rounded-md h-10 px-6 text-[13px] font-medium transition-colors"
-                >
-                  No
-                </Button>
-                <Button
-                  onClick={() => handleAnswer(true)}
-                  className="bg-accent hover:bg-accent-hover text-accent-foreground rounded-md h-10 px-6 text-[13px] font-medium transition-colors"
-                >
-                  Yes
-                </Button>
+              <div className="flex flex-col gap-3 max-w-sm mx-auto">
+                {currentQ.options.map((option, idx) => (
+                  <Button
+                    key={idx}
+                    onClick={() => handleAnswer(option)}
+                    className="bg-surface-2 hover:bg-surface-3 border border-border text-foreground-muted hover:text-foreground rounded-md h-auto py-3 px-4 text-[13px] font-medium transition-colors text-left justify-start"
+                  >
+                    {option}
+                  </Button>
+                ))}
               </div>
             </motion.div>
           ) : (
@@ -145,7 +177,7 @@ export function SkillAssessment({ selectedSkill, answers, onAnswer, onNext, onBa
               </div>
               <h3 className="text-[15px] font-semibold text-foreground mb-2">Assessment Finished</h3>
               <p className="text-[13px] text-foreground-muted max-w-sm mx-auto leading-relaxed">
-                Your response profile has been recorded. Let&apos;s customize your learning preferences.
+                Your response profile has been recorded. Let's customize your learning preferences.
               </p>
             </motion.div>
           )}

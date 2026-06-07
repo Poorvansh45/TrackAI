@@ -48,9 +48,7 @@ export function RoadmapGeneration({ data, onNext }: RoadmapGenerationProps) {
       try {
         const payload = {
           skill: data.selectedSkill || "custom",
-          assessment_answers: Object.fromEntries(
-            Object.entries(data.assessmentAnswers).map(([k, v]) => [k, v ? "Yes" : "No"])
-          ),
+          assessment_answers: data.assessmentAnswers,
           user_preferences: {
             daily_hours: data.studyHours,
             weekly_availability: data.weeklyDays,

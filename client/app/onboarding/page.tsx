@@ -12,7 +12,7 @@ import { DashboardEntry } from "@/components/onboarding/dashboard-entry"
 
 export interface OnboardingData {
   selectedSkill: string | null
-  assessmentAnswers: Record<string, boolean>
+  assessmentAnswers: Record<string, string>
   studyHours: number
   weeklyDays: number
   learningStyles: string[]
