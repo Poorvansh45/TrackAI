@@ -1,9 +1,26 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Flame } from "lucide-react"
 
 export function WelcomeHeader() {
+  const [userName, setUserName] = useState("Learner")
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("user")
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        // Check for common name fields: first_name, name, username, etc.
+        const name = user.first_name || user.name || user.username || "Learner"
+        setUserName(name)
+      }
+    } catch (e) {
+      console.error("Failed to parse user profile", e)
+    }
+  }, [])
+
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -20,7 +37,7 @@ export function WelcomeHeader() {
     >
       <div>
         <h1 className="text-display text-2xl sm:text-3xl text-foreground">
-          Good morning, <span className="text-accent">John</span>
+          Good morning, <span className="text-accent">{userName}</span>
         </h1>
         <p className="text-mono text-[10px] text-foreground-subtle mt-1 tracking-wider">
           SYSTEM TIMESTAMP: {currentDate}

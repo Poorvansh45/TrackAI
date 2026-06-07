@@ -1,15 +1,60 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Calendar, Clock, CheckCircle2 } from "lucide-react"
 
-const todayPlans = [
-  { id: 1, time: "09:00 - 10:00", subject: "RAG Pipeline Setup", done: true },
-  { id: 2, time: "13:00 - 13:30", subject: "Evaluation & Benchmarks", active: true },
-  { id: 3, time: "16:00 - 17:00", subject: "Chunking review session", done: false },
-]
+interface Plan {
+  id: number
+  time: string
+  subject: string
+  done: boolean
+  active?: boolean
+}
 
 export function PlannerCard() {
+  const [plans, setPlans] = useState<Plan[]>([
+    { id: 1, time: "--:--", subject: "Loading plan...", done: false }
+  ])
+
+  useEffect(() => {
+    const saved = localStorage.getItem("generatedRoadmap")
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed?.timeline_result?.weekly_schedule) {
+          const schedule = parsed.timeline_result.weekly_schedule
+          
+          if (schedule.length > 0) {
+            const firstWeek = schedule[0]
+            const newPlans: Plan[] = []
+            
+            // Map milestones to today's plan
+            if (firstWeek.milestones && firstWeek.milestones.length > 0) {
+              const times = ["09:00 - 10:30", "11:00 - 12:30", "14:00 - 15:30", "16:00 - 17:30"]
+              
+              firstWeek.milestones.slice(0, 3).forEach((milestone: string, i: number) => {
+                newPlans.push({
+                  id: i + 1,
+                  time: times[i] || "18:00 - 19:30",
+                  subject: milestone,
+                  done: false,
+                  active: i === 0 // Make first one active
+                })
+              })
+            }
+            
+            if (newPlans.length > 0) {
+              setPlans(newPlans)
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse roadmap", e)
+      }
+    }
+  }, [])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -30,7 +75,7 @@ export function PlannerCard() {
       </div>
 
       <div className="space-y-2">
-        {todayPlans.map((plan) => (
+        {plans.map((plan) => (
           <div 
             key={plan.id}
             className={`flex items-center gap-3 p-2.5 rounded border transition-all ${
@@ -39,7 +84,7 @@ export function PlannerCard() {
                 : "bg-surface-1/40 border-transparent"
             }`}
           >
-            <div className={`w-2 h-2 rounded-full ${
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
               plan.done 
                 ? "bg-success" 
                 : plan.active 

@@ -124,10 +124,34 @@ async def generate_roadmap(payload: GenerateRoadmapRequest):
         result = await loop.run_in_executor(None, run_tracks_ai_workflow, input_data)
 
     except Exception as exc:
+        from app.tracks.llm.gemini import QuotaExhaustedError, _is_quota_or_api_error
+
         logger.error("Tracks AI workflow failed: %s", exc, exc_info=True)
+
+        # --- Quota / rate-limit errors → 429 with user-friendly message ---
+        if isinstance(exc, QuotaExhaustedError) or _is_quota_or_api_error(exc):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "message": (
+                        "AI service is temporarily busy. "
+                        "Please try again in a few minutes."
+                    ),
+                    "error_code": "QUOTA_EXHAUSTED",
+                    "retry_after_seconds": 60,
+                },
+            )
+
+        # --- Everything else → 503 with sanitized message ---
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Roadmap generation failed: {str(exc)}",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "message": (
+                    "Roadmap generation encountered an unexpected issue. "
+                    "Please try again shortly."
+                ),
+                "error_code": "GENERATION_FAILED",
+            },
         )
 
     return GenerateRoadmapResponse(

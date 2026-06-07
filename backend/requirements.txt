@@ -15,8 +15,9 @@ passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.9
 python-dotenv>=1.0.1
 
-# Tracks AI — LangChain + LangGraph + Gemini
+# Tracks AI — LangChain + LangGraph + Gemini + Groq fallback
 langchain>=0.3.0
 langchain-community>=0.3.0
 langchain-google-genai>=2.0.0
+langchain-groq>=0.2.0
 langgraph>=0.2.0

@@ -20,13 +20,24 @@ Why Groq fallback?
 Usage
 -----
 All agents call get_llm() — the correct backend is selected automatically.
-The singleton is reset on fallback so subsequent calls also use Groq.
+If Gemini fails during .invoke(), LangChain .with_fallbacks() auto-retries
+with Groq. No agent code changes required.
 """
 
 import logging
 import os
 
 logger = logging.getLogger("uvicorn.error")
+
+# ---------------------------------------------------------------------------
+# Custom exception
+# ---------------------------------------------------------------------------
+
+
+class QuotaExhaustedError(Exception):
+    """Raised when all LLM providers (Gemini + Groq) are exhausted."""
+    pass
+
 
 # ---------------------------------------------------------------------------
 # Internal state
@@ -79,6 +90,7 @@ def _build_gemini():
         model="gemini-2.0-flash-lite",   # cheapest Gemini, ample free quota
         temperature=0,
         google_api_key=api_key,
+        max_retries=2,                   # built-in HTTP-level retry for transient errors
     )
 
 
@@ -94,7 +106,7 @@ def _build_groq():
             "Get a free key at https://console.groq.com/keys"
         )
 
-    logger.warning("[LLM] Falling back to Groq: llama-3.3-70b-versatile")
+    logger.warning("[LLM] Preparing Groq fallback: llama-3.3-70b-versatile")
     return ChatGroq(
         model="llama-3.3-70b-versatile",  # best free Groq model for structured output
         temperature=0,
@@ -110,24 +122,49 @@ def get_llm():
     """
     Return the active LLM instance (lazy singleton).
 
-    On first call → tries Gemini 2.0 Flash Lite.
-    If Gemini raises a quota / API error at invocation time → falls back to Groq.
-    Subsequent calls reuse whichever backend is active.
+    On first call → builds Gemini 2.0 Flash Lite with Groq as a fallback.
+    LangChain's .with_fallbacks() means that if Gemini raises *during
+    .invoke()* (e.g. 429 quota errors), it automatically retries with Groq.
 
-    Note: The fallback is also triggered per-agent if Gemini raises during
-    .invoke().  Agents should wrap their call in a try/except and call
-    reset_to_groq() if needed — but for most quota errors the error surfaces
-    at the first agent call and the graph stops, so the router catches it.
+    This is fully transparent to all agents — they call get_llm() and
+    .with_structured_output() exactly as before.
     """
     global _llm, _using_fallback
 
     if _llm is None:
+        gemini = None
+        groq = None
+
+        # Try to build Gemini
         try:
-            _llm = _build_gemini()
-        except RuntimeError:
-            # GOOGLE_API_KEY not set at all — try Groq directly
-            _llm = _build_groq()
+            gemini = _build_gemini()
+        except RuntimeError as e:
+            logger.warning("[LLM] Gemini not available: %s", e)
+
+        # Try to build Groq
+        try:
+            groq = _build_groq()
+        except RuntimeError as e:
+            logger.warning("[LLM] Groq not available: %s", e)
+
+        if gemini and groq:
+            # Best case: Gemini primary with automatic Groq fallback
+            _llm = gemini.with_fallbacks([groq])
+            logger.info("[LLM] Ready: Gemini (primary) + Groq (fallback)")
+        elif gemini:
+            # Gemini only, no fallback
+            _llm = gemini
+            logger.info("[LLM] Ready: Gemini only (no Groq fallback configured)")
+        elif groq:
+            # Groq only (Gemini key missing)
+            _llm = groq
             _using_fallback = True
+            logger.info("[LLM] Ready: Groq only (Gemini not configured)")
+        else:
+            raise QuotaExhaustedError(
+                "No LLM provider available. Set GOOGLE_API_KEY and/or "
+                "GROQ_API_KEY in backend/.env"
+            )
 
     return _llm
 

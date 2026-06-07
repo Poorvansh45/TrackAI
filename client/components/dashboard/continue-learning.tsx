@@ -1,19 +1,57 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Play, Clock, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-const currentLesson = {
-  title: "Vector Embeddings & Semantic Search",
-  module: "AI/ML Track · Module 3",
-  progress: 65,
-  timeLeft: "12 min left",
-  completedSections: 3,
-  totalSections: 5,
-}
-
 export function ContinueLearning() {
+  const [currentLesson, setCurrentLesson] = useState({
+    title: "Loading...",
+    module: "Loading Track...",
+    progress: 0,
+    timeLeft: "0 min left",
+    completedSections: 0,
+    totalSections: 0,
+  })
+
+  useEffect(() => {
+    const saved = localStorage.getItem("generatedRoadmap")
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed?.roadmap_result?.phases) {
+          const phases = parsed.roadmap_result.phases
+          
+          let title = "Ready to start"
+          let moduleLabel = parsed.skill ? `${parsed.skill} Track` : "Your Track"
+          let totalSecs = 0
+
+          // Just grab the first topic of the first phase for now
+          if (phases.length > 0) {
+            const firstPhase = phases[0]
+            moduleLabel = `${parsed.skill ? parsed.skill + ' · ' : ''}Phase ${firstPhase.phase_number || 1}`
+            if (firstPhase.topics && firstPhase.topics.length > 0) {
+              title = firstPhase.topics[0]
+              totalSecs = firstPhase.topics.length
+            }
+          }
+
+          setCurrentLesson({
+            title,
+            module: moduleLabel,
+            progress: 0, // No progress tracking yet
+            timeLeft: "Start now", // No time tracking yet
+            completedSections: 0,
+            totalSections: totalSecs,
+          })
+        }
+      } catch (e) {
+        console.error("Failed to parse roadmap", e)
+      }
+    }
+  }, [])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}

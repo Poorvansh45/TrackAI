@@ -1,16 +1,58 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Zap, CheckCircle2, Clock } from "lucide-react"
 
-const missions = [
-  { id: 1, name: "Complete RAG lesson 3", time: "15 min", xp: 75, status: "done" as const },
-  { id: 2, name: "Pass quiz: Vector Embeddings", time: "10 min", xp: 100, status: "done" as const },
-  { id: 3, name: "Review weak concept: Chunking", time: "8 min", xp: 50, status: "active" as const },
-  { id: 4, name: "30 min focused study session", time: "30 min", xp: 150, status: "pending" as const },
-]
+interface Mission {
+  id: number
+  name: string
+  time: string
+  xp: number
+  status: "done" | "active" | "pending"
+}
 
 export function DailyMissions() {
+  const [missions, setMissions] = useState<Mission[]>([
+    { id: 1, name: "Loading missions...", time: "--", xp: 0, status: "pending" }
+  ])
+
+  useEffect(() => {
+    const saved = localStorage.getItem("generatedRoadmap")
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed?.roadmap_result?.phases) {
+          const phases = parsed.roadmap_result.phases
+          
+          if (phases.length > 0) {
+            const firstPhase = phases[0]
+            const newMissions: Mission[] = []
+            
+            // Generate missions from the first few topics
+            if (firstPhase.topics && firstPhase.topics.length > 0) {
+              firstPhase.topics.slice(0, 4).forEach((topic: string, i: number) => {
+                newMissions.push({
+                  id: i + 1,
+                  name: `Study: ${topic}`,
+                  time: "30 min",
+                  xp: 100,
+                  status: i === 0 ? "active" : "pending" // First one active, rest pending
+                })
+              })
+            }
+            
+            if (newMissions.length > 0) {
+              setMissions(newMissions)
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse roadmap", e)
+      }
+    }
+  }, [])
+
   const completedCount = missions.filter((m) => m.status === "done").length
 
   return (
@@ -34,7 +76,7 @@ export function DailyMissions() {
       </div>
 
       <div className="space-y-1.5">
-        {missions.map((mission, index) => {
+        {missions.map((mission) => {
           const isDone = mission.status === "done"
           const isActive = mission.status === "active"
 
@@ -56,7 +98,7 @@ export function DailyMissions() {
               )}
               
               <div className="flex-1 min-w-0">
-                <span className={`text-[12px] ${isDone ? "text-foreground-subtle line-through" : "text-foreground"}`}>
+                <span className={`text-[12px] truncate block ${isDone ? "text-foreground-subtle line-through" : "text-foreground"}`}>
                   {mission.name}
                 </span>
               </div>

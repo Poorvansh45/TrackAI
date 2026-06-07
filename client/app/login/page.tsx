@@ -116,7 +116,7 @@ export default function LoginPage() {
         JSON.stringify(response.data.user)
       );
 
-      window.location.href = "/dashboard";
+      window.location.href = "/";
     } catch (error: any) {
       setError(
         error.response?.data?.detail ||

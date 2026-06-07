@@ -1,18 +1,62 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { CheckCircle2, Lock, Play, ChevronRight } from "lucide-react"
+import { CheckCircle2, Lock, ChevronRight } from "lucide-react"
 import Link from "next/link"
 
-const roadmapNodes = [
-  { id: "RD-001", name: "Python & Data Science Setup", status: "completed", xp: 500 },
-  { id: "RD-002", name: "RAG Systems Architecture", status: "completed", xp: 750 },
-  { id: "RD-003", name: "Vector Embeddings & Search", status: "current", xp: 1200, progress: 65 },
-  { id: "RD-004", name: "Agentic Workflows (LangGraph)", status: "locked", xp: 1000 },
-  { id: "RD-005", name: "LLM Fine-Tuning & Evaluation", status: "locked", xp: 2000 },
-]
+interface Node {
+  id: string
+  name: string
+  status: "completed" | "current" | "locked"
+  xp: number
+  progress?: number
+}
 
 export function RoadmapCard() {
+  const [nodes, setNodes] = useState<Node[]>([
+    { id: "RD-001", name: "Loading...", status: "locked", xp: 0 }
+  ])
+  const [skillLabel, setSkillLabel] = useState("Loading Track...")
+
+  useEffect(() => {
+    const saved = localStorage.getItem("generatedRoadmap")
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed?.skill) setSkillLabel(`${parsed.skill} Track`)
+        
+        if (parsed?.roadmap_result?.phases) {
+          const phases = parsed.roadmap_result.phases
+          const newNodes: Node[] = []
+          let foundCurrent = false
+          let count = 1
+
+          for (const p of phases) {
+            for (const topic of p.topics || []) {
+              const isCurrent = !foundCurrent
+              if (isCurrent) foundCurrent = true
+              
+              newNodes.push({
+                id: `RD-${String(count).padStart(3, '0')}`,
+                name: topic,
+                status: isCurrent ? "current" : "locked",
+                xp: 100 * count,
+                progress: isCurrent ? 0 : undefined
+              })
+              count++
+              if (newNodes.length >= 5) break // Only show first 5 on dashboard
+            }
+            if (newNodes.length >= 5) break
+          }
+          if (newNodes.length > 0) setNodes(newNodes)
+        }
+      } catch (e) {
+        console.error("Failed to parse roadmap", e)
+      }
+    }
+  }, [])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -23,7 +67,7 @@ export function RoadmapCard() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-[14px] font-semibold text-foreground">Learning Roadmap</h3>
-          <p className="text-[11px] text-foreground-subtle">AI/ML Engineering Track</p>
+          <p className="text-[11px] text-foreground-subtle">{skillLabel}</p>
         </div>
         <Link href="/dashboard/roadmap">
           <button className="flex items-center gap-1 text-mono text-[10px] text-accent hover:text-accent-hover transition-colors font-medium">
@@ -38,7 +82,7 @@ export function RoadmapCard() {
         <div className="absolute left-3.5 top-2.5 bottom-2.5 w-[1px] bg-border/60" />
         
         <div className="space-y-3">
-          {roadmapNodes.map((node, index) => {
+          {nodes.map((node) => {
             const isCurrent = node.status === "current"
             const isCompleted = node.status === "completed"
             
@@ -77,7 +121,7 @@ export function RoadmapCard() {
                     </span>
                   </div>
                   
-                  {isCurrent && node.progress && (
+                  {isCurrent && node.progress !== undefined && (
                     <div className="mt-2 max-w-xs">
                       <div className="flex justify-between text-mono text-[9px] mb-1">
                         <span className="text-foreground-subtle">Concept verified</span>
