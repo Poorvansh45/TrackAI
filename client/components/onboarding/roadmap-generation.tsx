@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
-import { User, Route, FileQuestion, RefreshCw, CheckCircle2, Loader2 } from "lucide-react"
+import { User, Route, FileQuestion, RefreshCw, CheckCircle2, Loader2, AlertCircle } from "lucide-react"
 import type { OnboardingData } from "@/app/onboarding/page"
 
 const generationSteps = [
-  { id: 1, label: "Analyzing your profile", icon: User, duration: 1500 },
-  { id: 2, label: "Checking prerequisites", icon: CheckCircle2, duration: 1200 },
-  { id: 3, label: "Generating roadmap layout", icon: Route, duration: 1800 },
-  { id: 4, label: "Creating validation quizzes", icon: FileQuestion, duration: 1200 },
-  { id: 5, label: "Preparing revision system", icon: RefreshCw, duration: 1200 },
+  { id: 1, label: "Analyzing your profile", icon: User },
+  { id: 2, label: "Checking prerequisites", icon: CheckCircle2 },
+  { id: 3, label: "Generating roadmap layout", icon: Route },
+  { id: 4, label: "Creating validation quizzes", icon: FileQuestion },
+  { id: 5, label: "Preparing revision system", icon: RefreshCw },
 ]
 
 interface RoadmapGenerationProps {
@@ -21,67 +21,120 @@ interface RoadmapGenerationProps {
 export function RoadmapGeneration({ data, onNext }: RoadmapGenerationProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const isGenerating = useRef(false)
 
   useEffect(() => {
-    let timeout: NodeJS.Timeout
+    let isCancelled = false
 
-    const runStep = (stepIndex: number) => {
-      if (stepIndex >= generationSteps.length) {
-        timeout = setTimeout(() => {
-          onNext()
-        }, 800)
-        return
-      }
-
-      setCurrentStep(stepIndex)
-      
-      timeout = setTimeout(() => {
-        setCompletedSteps((prev) => [...prev, stepIndex])
-        runStep(stepIndex + 1)
-      }, generationSteps[stepIndex].duration)
+    const runSimulatedProgress = () => {
+       let step = 0;
+       const interval = setInterval(() => {
+           if (step < 4 && !isCancelled) {
+               setCompletedSteps(prev => [...new Set([...prev, step])])
+               step++
+               setCurrentStep(step)
+           }
+       }, 2000)
+       return interval
     }
 
-    runStep(0)
+    const generateRoadmap = async () => {
+      if (isGenerating.current) return
+      isGenerating.current = true
+      
+      const progressInterval = runSimulatedProgress()
+      
+      try {
+        const payload = {
+          skill: data.selectedSkill || "custom",
+          assessment_answers: Object.fromEntries(
+            Object.entries(data.assessmentAnswers).map(([k, v]) => [k, v ? "Yes" : "No"])
+          ),
+          user_preferences: {
+            daily_hours: data.studyHours,
+            weekly_availability: data.weeklyDays,
+            learning_style: data.learningStyles.join(", ") || "Mixed",
+            goal: data.goals.join(", ") || "General Learning"
+          }
+        }
 
-    return () => clearTimeout(timeout)
-  }, [onNext])
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
+        
+        const response = await fetch(`${apiUrl}/tracks/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        })
 
-  const progress = (completedSteps.length / generationSteps.length) * 100
+        if (!response.ok) {
+          throw new Error("Failed to generate roadmap from server.")
+        }
+        
+        const result = await response.json()
+        if (isCancelled) return
+        
+        try {
+          localStorage.setItem("generatedRoadmap", JSON.stringify(result))
+        } catch (e) {
+          console.warn("localStorage access denied", e)
+        }
+        
+        clearInterval(progressInterval)
+        setCompletedSteps([0, 1, 2, 3, 4])
+        setCurrentStep(5)
+        
+        setTimeout(() => {
+          if (!isCancelled) onNext()
+        }, 800)
+
+      } catch (err: any) {
+        clearInterval(progressInterval)
+        if (!isCancelled) {
+          setError(err.message || "An error occurred during generation.")
+        }
+      }
+    }
+
+    generateRoadmap()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [data, onNext])
+
+  const progress = error ? 0 : (completedSteps.length / generationSteps.length) * 100
 
   return (
     <div className="min-h-screen flex items-center justify-center p-5">
       <div className="w-full max-w-[500px] mx-auto relative z-10">
-        {/* Title */}
         <div className="text-center mb-8">
-          <div className="w-9 h-9 rounded-md bg-accent/15 flex items-center justify-center mx-auto mb-4 text-accent">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className={`w-9 h-9 rounded-md flex items-center justify-center mx-auto mb-4 ${error ? 'bg-destructive/15 text-destructive' : 'bg-accent/15 text-accent'}`}>
+            {error ? <AlertCircle className="w-4 h-4" /> : <Loader2 className="w-4 h-4 animate-spin" />}
           </div>
           <h2 className="text-display text-2xl sm:text-3xl text-foreground mb-2">
-            Building Your <span className="text-accent">Cockpit</span>
+            {error ? "Generation Failed" : <>Building Your <span className="text-accent">Cockpit</span></>}
           </h2>
           <p className="text-foreground-muted text-[13px] font-mono">
-            ESTIMATED COMPILE TIME: ~6.5s
+            {error ? "Please try again later." : "ESTIMATED COMPILE TIME: ~10.5s"}
           </p>
         </div>
 
-        {/* Progress bar */}
         <div className="mb-6">
           <div className="h-1 bg-surface-2 rounded-full overflow-hidden border border-border/20">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.3 }}
-              className="h-full bg-accent rounded-full"
+              className={`h-full rounded-full ${error ? 'bg-destructive' : 'bg-accent'}`}
             />
           </div>
         </div>
 
-        {/* Generation steps card */}
         <div className="surface-card p-4 space-y-2">
           {generationSteps.map((step, index) => {
             const isCompleted = completedSteps.includes(index)
-            const isCurrent = currentStep === index && !isCompleted
-            const isPending = !isCompleted && !isCurrent
+            const isCurrent = currentStep === index && !isCompleted && !error
             
             return (
               <div
@@ -122,8 +175,8 @@ export function RoadmapGeneration({ data, onNext }: RoadmapGenerationProps) {
                   {step.label}
                 </span>
                 
-                <span className="text-mono text-[9px] text-foreground-subtle uppercase">
-                  {isCompleted ? "DONE" : isCurrent ? "COMPILING" : "PENDING"}
+                <span className={`text-mono text-[9px] uppercase ${error && isCurrent ? 'text-destructive' : 'text-foreground-subtle'}`}>
+                  {isCompleted ? "DONE" : error && isCurrent ? "ERROR" : isCurrent ? "COMPILING" : "PENDING"}
                 </span>
               </div>
             )

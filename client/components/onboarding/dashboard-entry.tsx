@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -12,28 +13,32 @@ interface DashboardEntryProps {
 
 export function DashboardEntry({ data }: DashboardEntryProps) {
   const router = useRouter()
+  const [roadmap, setRoadmap] = useState<any>(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("generatedRoadmap")
+      if (saved) {
+        setRoadmap(JSON.parse(saved))
+      }
+    } catch (e) {
+      console.error("Failed to access or parse roadmap", e)
+    }
+  }, [])
 
   const handleEnterDashboard = () => {
     router.push("/dashboard")
   }
 
-  const skillName = data.selectedSkill === "ai-ml" 
-    ? "AI/ML Engineering" 
-    : data.selectedSkill === "fullstack" 
-      ? "Full Stack Development" 
-      : data.selectedSkill === "data-science"
-        ? "Data Science"
-        : data.selectedSkill === "dsa"
-          ? "DSA & Problem Solving"
-          : data.selectedSkill === "devops"
-            ? "DevOps & Cloud Systems"
-            : data.selectedSkill === "trading"
-              ? "Quantitative Trading"
-              : data.selectedSkill === "cybersecurity"
-                ? "Cybersecurity Specialist"
-                : data.selectedSkill === "cloud"
-                  ? "Cloud Architecture"
-                  : "Custom Engineering Path"
+  const roadmapData = roadmap?.roadmap_result || {}
+  const moduleCount = Array.isArray(roadmapData.phases) ? roadmapData.phases.length : 8
+  const checkpointCount = Array.isArray(roadmapData.phases) 
+    ? roadmapData.phases.reduce((acc: number, p: any) => acc + (Array.isArray(p.topics) ? p.topics.length : 0), 0) 
+    : 12
+  const firstMissionName = roadmapData.phases?.[0]?.topics?.[0] || 
+    (data.selectedSkill === "ai-ml" ? "Complete RAG Fundamentals" : "Review ES6+ Fundamentals")
+
+  const skillName = roadmap?.skill || data.selectedSkill || "Custom Engineering Path"
 
   return (
     <div className="min-h-screen flex items-center justify-center p-5">
@@ -55,14 +60,12 @@ export function DashboardEntry({ data }: DashboardEntryProps) {
           </p>
         </motion.div>
 
-        {/* Recap Card */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.4 }}
           className="surface-card p-6 mb-8 space-y-5"
         >
-          {/* Track recap */}
           <div className="flex gap-4">
             <div className="w-8 h-8 rounded bg-accent/15 flex items-center justify-center text-accent flex-shrink-0">
               <Route className="w-4 h-4" />
@@ -71,12 +74,11 @@ export function DashboardEntry({ data }: DashboardEntryProps) {
               <span className="text-mono text-[9px] text-foreground-subtle uppercase">Target Curriculum</span>
               <h3 className="text-[13px] font-semibold text-foreground mt-0.5">{skillName}</h3>
               <p className="text-[11px] text-foreground-subtle mt-0.5">
-                8 modules · 12 verification checkpoints
+                {moduleCount} phases · {checkpointCount} topics
               </p>
             </div>
           </div>
 
-          {/* First mission */}
           <div className="flex gap-4">
             <div className="w-8 h-8 rounded bg-warning-muted flex items-center justify-center text-warning flex-shrink-0">
               <Zap className="w-4 h-4" />
@@ -84,7 +86,7 @@ export function DashboardEntry({ data }: DashboardEntryProps) {
             <div>
               <span className="text-mono text-[9px] text-foreground-subtle uppercase">First Mission Unlocked</span>
               <h3 className="text-[13px] font-semibold text-foreground mt-0.5">
-                {data.selectedSkill === "ai-ml" ? "Complete RAG Fundamentals" : "Review ES6+ Fundamentals"}
+                {firstMissionName}
               </h3>
               <p className="text-[11px] text-foreground-subtle mt-0.5">
                 Target: {data.studyHours.toFixed(1)}h daily pace · {data.weeklyDays} days / week
@@ -92,7 +94,6 @@ export function DashboardEntry({ data }: DashboardEntryProps) {
             </div>
           </div>
 
-          {/* Mentor status */}
           <div className="flex gap-4">
             <div className="w-8 h-8 rounded bg-success-muted flex items-center justify-center text-success flex-shrink-0">
               <Brain className="w-4 h-4" />
@@ -107,7 +108,6 @@ export function DashboardEntry({ data }: DashboardEntryProps) {
           </div>
         </motion.div>
 
-        {/* Enter CTA */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
