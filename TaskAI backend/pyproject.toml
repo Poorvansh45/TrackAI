@@ -1,0 +1,20 @@
+[project]
+name = "langchain-learning"
+version = "0.1.0"
+description = "LangChain Learning"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "langchain",
+    "langchain-community",
+    "langchain-openai",
+    "langchain-groq",
+    "langchain-google-genai",
+    "python-dotenv",
+    "ipykernel",
+    "langgraph>=1.2.4",
+    "pydantic>=2.13.4",
+    "fastapi>=0.136.3",
+    "uvicorn[standard]>=0.49.0",
+]

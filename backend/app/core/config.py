@@ -11,7 +11,10 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "supersecretkeychangeinproduction"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 11520  # 8 days
-    
+
+    # Tracks AI — Gemini LLM
+    GOOGLE_API_KEY: str = ""
+
     BACKEND_CORS_ORIGINS: Union[List[str], str] = []
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
