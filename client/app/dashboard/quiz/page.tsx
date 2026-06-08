@@ -2,9 +2,8 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { Check, X, ArrowRight, RefreshCw, AlertTriangle, Lightbulb } from "lucide-react"
+import Link from "next/link"
 
 const quizQuestions = [
   {
@@ -88,18 +87,11 @@ export default function QuizPage() {
   const progress = ((currentIdx) / quizQuestions.length) * 100
 
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardNav />
-      
-      <div className="flex">
-        <DashboardSidebar />
-        
-        <main className="flex-1 p-5 lg:p-8 lg:pl-20 pt-16">
-          <div className="max-w-[700px] mx-auto space-y-6">
+    <div className="max-w-[700px] mx-auto space-y-6">
             {/* Header */}
             <div className="border-b border-border/40 pb-5 flex items-center justify-between gap-4">
               <div>
-                <h1 className="text-display text-2xl sm:text-3xl text-foreground">
+                <h1 className="text-display text-2xl sm:text-3xl text-foreground leading-normal">
                   Skill <span className="text-accent">Verification</span>
                 </h1>
                 <p className="text-mono text-[10px] text-foreground-subtle mt-1 tracking-wider">
@@ -280,9 +272,6 @@ export default function QuizPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        </main>
-      </div>
     </div>
   )
 }

@@ -111,7 +111,8 @@
 // }
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -128,12 +129,34 @@ import {
 import api from "@/lib/api";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [error, setError] = useState("");
+  const [redirectPath, setRedirectPath] = useState("/dashboard");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const redir = params.get("redirect");
+      if (redir) {
+        setRedirectPath(redir);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      router.replace(redirectPath);
+    } else {
+      setCheckingAuth(false);
+    }
+  }, [router, redirectPath]);
 
   const passwordStrength =
     password.length === 0
@@ -167,7 +190,7 @@ export default function RegisterPage() {
         JSON.stringify(response.data.user)
       );
 
-      window.location.href = "/dashboard";
+      window.location.replace(redirectPath);
     } catch (error: any) {
       setError(
         error.response?.data?.detail ||
@@ -177,6 +200,21 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-5">
+        <div className="text-center space-y-4 max-w-xs mx-auto">
+          <div className="w-9 h-9 rounded-md bg-accent/15 flex items-center justify-center mx-auto text-accent">
+            <span className="font-semibold text-xs animate-pulse">T</span>
+          </div>
+          <div>
+            <h3 className="text-foreground font-semibold text-sm">Verifying Session...</h3>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden">
