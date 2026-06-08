@@ -14,6 +14,7 @@ import { NotesCard } from "@/components/dashboard/notes-card"
 import { AIMentorCard } from "@/components/dashboard/ai-mentor-card"
 import { PlannerCard } from "@/components/dashboard/planner-card"
 import { Loader2 } from "lucide-react"
+import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
 export default function DashboardPage() {
   const { roadmapExists, loading } = useRoadmap()
@@ -33,7 +34,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-6">
+    <PageWrapper maxWidth="xl">
       <WelcomeHeader />
       
       {/* Main Command Deck Grid */}
@@ -56,7 +57,7 @@ export default function DashboardPage() {
           <PlannerCard />
         </div>
       </div>
-    </div>
+    </PageWrapper>
   )
 }
 

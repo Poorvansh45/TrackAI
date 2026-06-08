@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Clock, Calendar, Target, BookOpen, ChevronDown, ChevronUp, TrendingUp } from "lucide-react"
+import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
 interface WeeklyPlan {
   week_number: number
@@ -55,7 +56,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="max-w-[800px] mx-auto space-y-6">
+    <PageWrapper maxWidth="md">
 
             {/* Header */}
             <div className="border-b border-border/40 pb-5 mb-6">
@@ -213,6 +214,6 @@ export default function TimelinePage() {
                 </div>
               </>
             )}
-    </div>
+    </PageWrapper>
   )
 }

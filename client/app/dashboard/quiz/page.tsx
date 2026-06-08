@@ -4,6 +4,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, X, ArrowRight, RefreshCw, AlertTriangle, Lightbulb } from "lucide-react"
 import Link from "next/link"
+import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
 const quizQuestions = [
   {
@@ -87,7 +88,7 @@ export default function QuizPage() {
   const progress = ((currentIdx) / quizQuestions.length) * 100
 
   return (
-    <div className="max-w-[700px] mx-auto space-y-6">
+    <PageWrapper maxWidth="sm">
             {/* Header */}
             <div className="border-b border-border/40 pb-5 flex items-center justify-between gap-4">
               <div>
@@ -272,6 +273,6 @@ export default function QuizPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-    </div>
+    </PageWrapper>
   )
 }

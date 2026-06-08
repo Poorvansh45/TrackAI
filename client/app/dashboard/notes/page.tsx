@@ -1,6 +1,7 @@
 "use client"
 
 import { FileText, Download, BookOpen, ChevronRight, CheckSquare, Bookmark } from "lucide-react"
+import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
 const noteSections = [
   {
@@ -27,7 +28,7 @@ const noteSections = [
 
 export default function NotesPage() {
   return (
-    <div className="max-w-[1000px] mx-auto space-y-6">
+    <PageWrapper maxWidth="lg">
             {/* Header */}
             <div className="border-b border-border/40 pb-5 flex items-center justify-between gap-4">
               <div>
@@ -113,6 +114,6 @@ export default function NotesPage() {
                 </div>
               </div>
             </div>
-    </div>
+    </PageWrapper>
   )
 }

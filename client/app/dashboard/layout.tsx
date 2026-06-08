@@ -7,28 +7,17 @@ import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { useRoadmap } from "@/hooks/use-roadmap"
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const router = useRouter()
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router   = useRouter()
   const pathname = usePathname()
   const [loading, setLoading] = useState(true)
   const { roadmapExists, loading: roadmapLoading } = useRoadmap()
 
   useEffect(() => {
     const token = localStorage.getItem("token")
-    if (!token) {
-      router.replace("/login")
-      return
-    } 
-
+    if (!token) { router.replace("/login"); return }
     if (!roadmapLoading) {
-      if (!roadmapExists && pathname !== "/dashboard") {
-        router.replace("/dashboard")
-        return
-      }
+      if (!roadmapExists && pathname !== "/dashboard") { router.replace("/dashboard"); return }
       setLoading(false)
     }
   }, [router, pathname, roadmapExists, roadmapLoading])
@@ -40,25 +29,21 @@ export default function DashboardLayout({
           <div className="w-9 h-9 rounded-md bg-accent/15 flex items-center justify-center mx-auto text-accent">
             <Loader2 className="w-4 h-4 animate-spin" />
           </div>
-          <div>
-            <h3 className="text-foreground font-semibold text-sm">Verifying Session</h3>
-            <p className="text-foreground-subtle text-[11px] font-mono mt-1 uppercase tracking-wider">
-              Establishing secure connection...
-            </p>
-          </div>
+          <h3 className="text-foreground font-semibold text-sm">Verifying Session</h3>
         </div>
       </div>
     )
   }
 
+  // Roadmap page gets full bleed — no container max-width applied
+  const isRoadmapPage = pathname === "/dashboard/roadmap"
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
-      
       <div className="flex">
         <DashboardSidebar />
-        
-        <main className="flex-1 p-5 pt-24 lg:p-8 lg:pl-20 lg:pt-24">
+        <main className={`flex-1 pt-16 lg:pl-14 ${isRoadmapPage ? "pb-4 px-4 lg:pb-6 lg:px-6" : "pb-5 px-5 lg:pb-8 lg:px-8"}`}>
           {children}
         </main>
       </div>
