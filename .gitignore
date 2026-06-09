@@ -1,15 +1,4 @@
-# Frontend
-client/node_modules/
-client/.next/
-client/out/
-
-# Backend
-backend/node_modules/
-backend/dist/
-backend/build/
-backend/env
-
-# Env files
+# Environment files
 .env
 .env.local
 /backend/venv
@@ -18,16 +7,49 @@ client/.env.local
 backend/venv
 
 
-# Python
-__pycache__/
-*.pyc
+# Python virtual environments
+backend/venv/
+backend/.venv/
+venv/
+.venv/
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+
+# Node
+node_modules/
+client/node_modules/
+
+# Next.js
+.next/
+client/.next/
+client/out/
+
+# Build
+dist/
+build/
+backend/dist/
+backend/build/
 
 # Logs
 *.log
 
 # IDE
 .vscode/
+.idea/
 
 # OS
 .DS_Store
 Thumbs.db
+
+README.md
+SETUP.md
+backend/.env.example
+backend/requirements.txt
+client/package.json
+
+graphify-out/
+venv_files.txt
+graphify-out/
+venv_files.txt

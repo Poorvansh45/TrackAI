@@ -11,7 +11,6 @@ interface TrackInfoPanelProps {
   totalNodes: number
   currentPhaseLabel: string
   currentPhaseNumber: number
-  
 }
 
 // Circular SVG progress ring

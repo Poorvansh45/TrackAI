@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Menu, X } from "lucide-react"
 import Link from "next/link"
+import { ProfileDropdown } from "@/components/dashboard/profile-dropdown"
 
 const navItems = [
   { name: "Features", href: "#features" },
@@ -17,8 +18,10 @@ const navItems = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
+    setIsAuthenticated(!!localStorage.getItem("token"))
     const handleScroll = () => {
       setScrolled(window.scrollY > 20)
     }
@@ -40,7 +43,7 @@ export function Navbar() {
       <div className="max-w-[1200px] mx-auto px-5">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group" id="nav-logo">
+          <Link href={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2.5 group" id="nav-logo">
             <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center">
               <span className="text-accent-foreground font-semibold text-xs">T</span>
             </div>
@@ -65,23 +68,29 @@ export function Navbar() {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/login">
-              <Button
-                variant="ghost"
-                className="text-[13px] text-foreground-muted hover:text-foreground h-8 px-3"
-                id="nav-login"
-              >
-                Log in
-              </Button>
-            </Link>
-            <Link href="/onboarding">
-              <Button
-                className="text-[13px] h-8 px-4 bg-accent hover:bg-accent-hover text-accent-foreground rounded-md"
-                id="nav-cta"
-              >
-                Start Setup
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <ProfileDropdown />
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button
+                    variant="ghost"
+                    className="text-[13px] text-foreground-muted hover:text-foreground h-8 px-3"
+                    id="nav-login"
+                  >
+                    Log in
+                  </Button>
+                </Link>
+                <Link href="/onboarding">
+                  <Button
+                    className="text-[13px] h-8 px-4 bg-accent hover:bg-accent-hover text-accent-foreground rounded-md"
+                    id="nav-cta"
+                  >
+                    Start Setup
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -115,18 +124,51 @@ export function Navbar() {
                   {item.name}
                 </Link>
               ))}
-              <div className="flex flex-col gap-2 pt-3 mt-2 border-t border-border">
-                <Link href="/login">
-                  <Button variant="ghost" className="w-full justify-start text-[13px] h-8">
-                    Log in
+              {isAuthenticated ? (
+                <div className="flex flex-col gap-1.5 pt-3 mt-2 border-t border-border">
+                  <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="ghost" className="w-full justify-start text-[13px] h-8 font-medium text-foreground-muted hover:text-foreground">
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard/roadmap" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="ghost" className="w-full justify-start text-[13px] h-8 font-medium text-foreground-muted hover:text-foreground">
+                      Roadmaps
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard#settings" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="ghost" className="w-full justify-start text-[13px] h-8 font-medium text-foreground-muted hover:text-foreground">
+                      Settings
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      localStorage.removeItem("token")
+                      localStorage.removeItem("user")
+                      localStorage.removeItem("generatedRoadmap")
+                      window.location.replace("/login")
+                    }}
+                    className="w-full justify-start text-[13px] h-8 font-semibold text-destructive hover:bg-destructive/10 hover:text-destructive animate-none"
+                  >
+                    Logout
                   </Button>
-                </Link>
-                <Link href="/onboarding">
-                  <Button className="w-full text-[13px] h-8 bg-accent hover:bg-accent-hover text-accent-foreground">
-                    Start Setup
-                  </Button>
-                </Link>
-              </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 pt-3 mt-2 border-t border-border">
+                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="ghost" className="w-full justify-start text-[13px] h-8">
+                      Log in
+                    </Button>
+                  </Link>
+                  <Link href="/onboarding" onClick={() => setMobileMenuOpen(false)}>
+                    <Button className="w-full text-[13px] h-8 bg-accent hover:bg-accent-hover text-accent-foreground">
+                      Start Setup
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

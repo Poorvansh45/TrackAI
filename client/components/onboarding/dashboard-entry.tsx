@@ -27,7 +27,7 @@ export function DashboardEntry({ data }: DashboardEntryProps) {
   }, [])
 
   const handleEnterDashboard = () => {
-    router.push("/dashboard")
+    router.replace("/dashboard")
   }
 
   const roadmapData = roadmap?.roadmap_result || {}

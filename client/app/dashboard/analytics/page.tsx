@@ -1,8 +1,7 @@
 "use client"
 
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { BarChart3, TrendingUp, Clock, Target, Calendar, Award, AlertTriangle, ShieldCheck } from "lucide-react"
+import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
 const monthlyTrend = [
   { week: "Wk 1", hours: 14.5, accuracy: 82 },
@@ -19,18 +18,11 @@ const weakAreas = [
 
 export default function AnalyticsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardNav />
-      
-      <div className="flex">
-        <DashboardSidebar />
-        
-        <main className="flex-1 p-5 lg:p-8 lg:pl-20 pt-16">
-          <div className="max-w-[1000px] mx-auto space-y-6">
+    <PageWrapper maxWidth="lg">
             {/* Header */}
             <div className="border-b border-border/40 pb-5 mb-6 flex items-center justify-between gap-4">
               <div>
-                <h1 className="text-display text-2xl sm:text-3xl text-foreground">
+                <h1 className="text-display text-2xl sm:text-3xl text-foreground leading-normal">
                   Performance <span className="text-accent">Analytics</span>
                 </h1>
                 <p className="text-mono text-[10px] text-foreground-subtle mt-1 tracking-wider">
@@ -97,7 +89,7 @@ export default function AnalyticsPage() {
                     {monthlyTrend.map((data, idx) => (
                       <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
                         <div className="w-full relative group">
-                          {/* Accuracy marker dot */}
+                           {/* Accuracy marker dot */}
                           <div 
                             className="absolute left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-accent z-10"
                             style={{ bottom: `${(data.accuracy / 100) * 100}px` }}
@@ -175,9 +167,6 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </main>
-      </div>
-    </div>
+    </PageWrapper>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { WelcomeScreen } from "@/components/onboarding/welcome-screen"
 import { SkillSelection } from "@/components/onboarding/skill-selection"
@@ -9,6 +10,8 @@ import { LearningPreferences } from "@/components/onboarding/learning-preference
 import { GoalSelection } from "@/components/onboarding/goal-selection"
 import { RoadmapGeneration } from "@/components/onboarding/roadmap-generation"
 import { DashboardEntry } from "@/components/onboarding/dashboard-entry"
+
+import { useRoadmap } from "@/hooks/use-roadmap"
 
 export interface OnboardingData {
   selectedSkill: string | null
@@ -29,8 +32,22 @@ const initialData: OnboardingData = {
 }
 
 export default function OnboardingPage() {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [data, setData] = useState<OnboardingData>(initialData)
+  const { roadmapExists, loading } = useRoadmap()
+
+  useEffect(() => {
+    if (loading) return
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.replace("/register?redirect=/onboarding")
+      return
+    }
+    if (token && roadmapExists) {
+      router.replace("/dashboard")
+    }
+  }, [router, roadmapExists, loading])
 
   const updateData = (updates: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }))

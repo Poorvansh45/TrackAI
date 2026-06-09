@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { Clock, Calendar, Target, BookOpen, ChevronDown, ChevronUp, TrendingUp } from "lucide-react"
+import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
 interface WeeklyPlan {
   week_number: number
@@ -57,18 +56,11 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardNav />
-
-      <div className="flex">
-        <DashboardSidebar />
-
-        <main className="flex-1 p-5 lg:p-8 lg:pl-20 pt-16">
-          <div className="max-w-[800px] mx-auto space-y-6">
+    <PageWrapper maxWidth="md">
 
             {/* Header */}
             <div className="border-b border-border/40 pb-5 mb-6">
-              <h1 className="text-display text-2xl sm:text-3xl text-foreground">
+              <h1 className="text-display text-2xl sm:text-3xl text-foreground leading-normal">
                 Study <span className="text-accent">Timeline</span>
               </h1>
               <p className="text-mono text-[10px] text-foreground-subtle mt-1 tracking-wider">
@@ -222,9 +214,6 @@ export default function TimelinePage() {
                 </div>
               </>
             )}
-          </div>
-        </main>
-      </div>
-    </div>
+    </PageWrapper>
   )
 }
