@@ -93,8 +93,8 @@ async def login_user(payload: LoginRequest):
             "role": user.get("role"),
             "created_at": user.get("created_at"),
             "updated_at": user.get("updated_at")
+            }
         }
-    }
 
 
 from app.core.security import decode_access_token       

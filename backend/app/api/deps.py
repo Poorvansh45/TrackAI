@@ -28,16 +28,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     db = get_database()
 
-    # Convert string user_id back to ObjectId for MongoDB lookup
-    try:
-        object_id = ObjectId(user_id)
-    except (InvalidId, Exception):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token subject"
-        )
 
-    user = await db.users.find_one({"_id": object_id})
+    all_users = await db.users.find().to_list(length=20)
+
+
+    user = await db.users.find_one({"_id": user_id})
 
     if not user:
         raise HTTPException(
