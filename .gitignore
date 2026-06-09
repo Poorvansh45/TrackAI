@@ -12,9 +12,11 @@ backend/env
 # Env files
 .env
 .env.local
+/backend/venv
 client/.env
 client/.env.local
-backend/.env
+backend/venv
+
 
 # Python
 __pycache__/
