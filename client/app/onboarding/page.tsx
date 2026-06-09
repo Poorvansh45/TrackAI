@@ -9,8 +9,10 @@ import { LearningPreferences } from "@/components/onboarding/learning-preference
 import { GoalSelection } from "@/components/onboarding/goal-selection"
 import { RoadmapGeneration } from "@/components/onboarding/roadmap-generation"
 import { DashboardEntry } from "@/components/onboarding/dashboard-entry"
+import useAuth from "@/hooks/use-Auth";
 
-export interface OnboardingData {
+export interface OnboardingData{
+
   selectedSkill: string | null
   assessmentAnswers: Record<string, string>
   studyHours: number
@@ -29,8 +31,19 @@ const initialData: OnboardingData = {
 }
 
 export default function OnboardingPage() {
+
   const [step, setStep] = useState(1)
   const [data, setData] = useState<OnboardingData>(initialData)
+   
+      const { loading, authenticated } = useAuth();
+
+  if(loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        Loading...
+      </div>
+    );
+  } 
 
   const updateData = (updates: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }))

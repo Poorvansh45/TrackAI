@@ -105,15 +105,23 @@ export default function LoginPage() {
         email,
         password,
       });
+      console.log("LOGIN RESPONSE:", response.data);
 
       localStorage.setItem(
         "token",
         response.data.access_token
       );
-
+      console.log(
+  "SAVED TOKEN:",
+  localStorage.getItem("token")
+      );
       localStorage.setItem(
         "user",
         JSON.stringify(response.data.user)
+      );
+      console.log(
+  "SAVED USER:",
+  localStorage.getItem("user")
       );
 
       window.location.href = "/";
@@ -121,9 +129,7 @@ export default function LoginPage() {
       setError(
         error.response?.data?.detail ||
           "Login failed"
-      );
-
-      console.error(error);
+      )
     } finally {
       setLoading(false);
     }

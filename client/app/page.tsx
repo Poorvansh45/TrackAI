@@ -1,3 +1,5 @@
+"use client";
+
 import { Navbar } from "@/components/landing/navbar"
 import { HeroSection } from "@/components/landing/hero"
 import { AIMentorSection } from "@/components/landing/ai-mentor"
@@ -10,7 +12,9 @@ import { PlannerSection } from "@/components/landing/planner-section"
 import { CTASection } from "@/components/landing/cta"
 import { Footer } from "@/components/landing/footer"
 
+
 export default function LandingPage() {
+
   return (
     <main className="min-h-screen bg-background relative overflow-hidden">
       <Navbar />

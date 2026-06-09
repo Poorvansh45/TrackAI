@@ -26,6 +26,9 @@ export default function TimelinePage() {
   const [timeline, setTimeline] = useState<TimelineData | null>(null)
   const [skill, setSkill] = useState<string>("")
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1]))
+  
+
+ 
 
   useEffect(() => {
     try {
