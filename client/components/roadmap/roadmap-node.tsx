@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { CheckCircle2, Lock, Play, Zap, Clock, BarChart2, ArrowRight } from "lucide-react"
 
@@ -29,10 +30,27 @@ const DIFFICULTY_CLASS: Record<string, string> = {
   Advanced:     "badge-advanced",
 }
 
+/** Convert a topic name to a URL-safe slug */
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+}
+
 export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
+  const router = useRouter()
   const isCompleted = node.status === "completed"
   const isActive    = node.status === "active"
   const isLocked    = node.status === "locked"
+
+  const handleContinue = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const slug = toSlug(node.name)
+    router.push(`/topic/${slug}`)
+  }
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -45,11 +63,10 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
           w-full group relative
           glass-panel px-4 py-3.5
           transition-all duration-300 ease-out
-          ${isActive  ? "glow-active"   : ""}
+          ${isActive    ? "glow-active"  : ""}
           ${isCompleted ? "glow-success" : ""}
-          ${isLocked  ? "opacity-45 cursor-not-allowed" : "cursor-pointer hover:scale-[1.015] hover:shadow-xl"}
+          ${isLocked    ? "opacity-45 cursor-not-allowed" : "cursor-pointer hover:scale-[1.015] hover:shadow-xl"}
         `}
-        style={isActive ? undefined : isCompleted ? undefined : undefined}
       >
         {/* Subtle inner scanlines on active node */}
         {isActive && (
@@ -99,18 +116,22 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
                 <Clock className="w-2.5 h-2.5" />{node.duration}
               </span>
               {isCompleted && (
-                <span className="text-mono text-[9px] text-success font-semibold ml-auto">✓ MASTERED</span>
+                <span className="text-mono text-[9px] text-success font-semibold ml-auto">
+                  ✓ MASTERED
+                </span>
               )}
             </div>
 
-            {/* Progress bar — only for active/completed */}
+            {/* Progress bar */}
             {!isLocked && (
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1 text-mono text-[8px] text-foreground-subtle">
                     <BarChart2 className="w-2.5 h-2.5" />Progress
                   </div>
-                  <span className="text-mono text-[8px] text-foreground-subtle">{node.progress}%</span>
+                  <span className="text-mono text-[8px] text-foreground-subtle">
+                    {node.progress}%
+                  </span>
                 </div>
                 <div className="h-1 bg-surface-3 rounded-full overflow-hidden">
                   <motion.div
@@ -121,27 +142,37 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
                     style={{
                       background: isCompleted
                         ? "oklch(0.60 0.16 155)"
-                        : "linear-gradient(to right, oklch(0.62 0.20 275), oklch(0.70 0.22 280))"
+                        : "linear-gradient(to right, oklch(0.62 0.20 275), oklch(0.70 0.22 280))",
                     }}
                   />
                 </div>
               </div>
             )}
 
-            {/* CTA button */}
+            {/* CTA button — routes to /topic/[slug] */}
             {!isLocked && (
-              <button className={`
-                flex items-center gap-1.5 text-mono text-[10px] font-semibold px-3 py-1.5 rounded-md
-                transition-all duration-200
-                ${isCompleted
-                  ? "bg-success/15 text-success border border-success/30 hover:bg-success/25"
-                  : "bg-accent/20 text-accent border border-accent/40 hover:bg-accent/30"
-                }
-              `}>
+              <button
+                onClick={handleContinue}
+                className={`
+                  flex items-center gap-1.5 text-mono text-[10px] font-semibold px-3 py-1.5 rounded-md
+                  transition-all duration-200
+                  ${isCompleted
+                    ? "bg-success/15 text-success border border-success/30 hover:bg-success/25"
+                    : "bg-accent/20 text-accent border border-accent/40 hover:bg-accent/30 hover:shadow-md hover:shadow-accent/10"
+                  }
+                `}
+              >
                 {isCompleted ? (
-                  <><CheckCircle2 className="w-3 h-3" />Review</>
+                  <>
+                    <CheckCircle2 className="w-3 h-3" />
+                    Review
+                  </>
                 ) : (
-                  <><Play className="w-3 h-3 fill-current" />Continue<ArrowRight className="w-3 h-3" /></>
+                  <>
+                    <Play className="w-3 h-3 fill-current" />
+                    Continue
+                    <ArrowRight className="w-3 h-3" />
+                  </>
                 )}
               </button>
             )}
@@ -153,9 +184,7 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
       {!isLast && (
         <div className="flex flex-col items-center py-1">
           <div className={`node-connector h-8 ${isCompleted ? "node-connector-done" : ""}`} />
-          <div className={`w-1.5 h-1.5 rounded-full ${
-            isCompleted ? "bg-success/60" : "bg-accent/30"
-          }`} />
+          <div className={`w-1.5 h-1.5 rounded-full ${isCompleted ? "bg-success/60" : "bg-accent/30"}`} />
           <div className={`node-connector h-4 ${isCompleted ? "node-connector-done" : ""}`} />
         </div>
       )}
