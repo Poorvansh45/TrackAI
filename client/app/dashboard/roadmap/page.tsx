@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { motion } from "framer-motion"
 import { Cpu, ChevronDown } from "lucide-react"
 import { TrackInfoPanel } from "@/components/roadmap/track-info-panel"
@@ -9,29 +9,28 @@ import { AIAssistantPanel } from "@/components/roadmap/ai-assistant-panel"
 import type { RoadmapNodeData, NodeStatus } from "@/components/roadmap/roadmap-node"
 import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
-// ─── Data enrichment helpers ────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced"] as const
-
-/** Assign difficulty based on topic index within the overall roadmap */
-function getDifficulty(phaseIdx: number, nodeIdx: number): "Beginner" | "Intermediate" | "Advanced" {
-  const combined = phaseIdx * 10 + nodeIdx
+function getDifficulty(pIdx: number, nIdx: number): "Beginner" | "Intermediate" | "Advanced" {
+  const combined = pIdx * 10 + nIdx
   if (combined <= 4)  return "Beginner"
   if (combined <= 12) return "Intermediate"
   return "Advanced"
 }
 
-/** Assign XP based on difficulty */
-function getXP(difficulty: "Beginner" | "Intermediate" | "Advanced"): number {
-  return difficulty === "Beginner" ? 100 : difficulty === "Intermediate" ? 180 : 280
+function getXP(d: "Beginner" | "Intermediate" | "Advanced") {
+  return d === "Beginner" ? 100 : d === "Intermediate" ? 180 : 280
 }
 
-/** Assign estimated duration based on difficulty */
-function getDuration(difficulty: "Beginner" | "Intermediate" | "Advanced"): string {
-  return difficulty === "Beginner" ? "~1.5h" : difficulty === "Intermediate" ? "~3h" : "~5h"
+function getDuration(d: "Beginner" | "Intermediate" | "Advanced") {
+  return d === "Beginner" ? "~1.5h" : d === "Intermediate" ? "~3h" : "~5h"
 }
 
-// ─── LocalStorage parser ────────────────────────────────────────────────────
+function toSlug(name: string) {
+  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "")
+}
+
+// ─── Roadmap parser (reads _nodeStatus overrides) ──────────────────────────
 
 interface ParsedRoadmap {
   skill: string
@@ -40,9 +39,11 @@ interface ParsedRoadmap {
   totalNodes: number
   currentPhaseLabel: string
   currentPhaseNumber: number
+  /** Set of topic slugs that were JUST unlocked (for glow animation) */
+  justUnlockedSlugs: Set<string>
 }
 
-function parseRoadmapData(): ParsedRoadmap | null {
+function parseRoadmapData(prevJustUnlocked?: Set<string>): ParsedRoadmap | null {
   try {
     const saved = localStorage.getItem("generatedRoadmap")
     if (!saved) return null
@@ -51,28 +52,58 @@ function parseRoadmapData(): ParsedRoadmap | null {
 
     const rawPhases = data.roadmap_result.phases
     let firstActiveSet = false
+    const justUnlockedSlugs = new Set<string>()
 
     const phases: PhaseData[] = rawPhases.map((p: any, pIdx: number) => {
+      const nodeStatusOverrides: Record<string, string> = p._nodeStatus || {}
+
       const nodes: RoadmapNodeData[] = (p.topics || []).map((topic: string, nIdx: number) => {
         const difficulty = getDifficulty(pIdx, nIdx)
-        const xp = getXP(difficulty)
-        const duration = getDuration(difficulty)
+        const slug = toSlug(topic)
 
-        // First node in the whole roadmap = active, rest start locked
+        // Determine status: override → first-active fallback → locked
         let status: NodeStatus = "locked"
-        if (!firstActiveSet) {
+        if (nodeStatusOverrides[topic]) {
+          status = nodeStatusOverrides[topic] as NodeStatus
+        } else if (!firstActiveSet) {
           status = "active"
+        }
+
+        if (status === "active" || status === "completed") {
           firstActiveSet = true
+        }
+
+        // Check if this node was newly unlocked (compare to previous state)
+        if (status === "active" && prevJustUnlocked === undefined) {
+          // first render — don't glow anything
+        } else if (status === "active" && prevJustUnlocked && !prevJustUnlocked.has(slug)) {
+          // Was previously not active → newly unlocked
+          justUnlockedSlugs.add(slug)
+        }
+
+        // Derive progress from saved localStorage progress
+        let progress = 0
+        if (status === "completed") {
+          progress = 100
+        } else if (status === "active") {
+          try {
+            const saved = localStorage.getItem(`topic_progress_${slug}`)
+            if (saved) {
+              const arr: string[] = JSON.parse(saved)
+              // We don't know total from roadmap; assume 5 subtopics
+              progress = Math.min(100, Math.round((arr.length / 5) * 100))
+            }
+          } catch {}
         }
 
         return {
           id:         `P${pIdx + 1}N${nIdx + 1}`,
           name:       topic,
           status,
-          progress:   status === "active" ? 0 : 0,
-          xp,
+          progress,
+          xp:         getXP(difficulty),
           difficulty,
-          duration,
+          duration:   getDuration(difficulty),
           phaseIndex: pIdx,
           nodeIndex:  nIdx,
         }
@@ -85,7 +116,7 @@ function parseRoadmapData(): ParsedRoadmap | null {
       }
     })
 
-    const allNodes      = phases.flatMap(p => p.nodes)
+    const allNodes       = phases.flatMap(p => p.nodes)
     const completedNodes = allNodes.filter(n => n.status === "completed").length
     const activePhase    = phases.find(p => p.nodes.some(n => n.status === "active"))
 
@@ -96,6 +127,7 @@ function parseRoadmapData(): ParsedRoadmap | null {
       totalNodes:         allNodes.length,
       currentPhaseLabel:  activePhase?.phaseTitle  || phases[0]?.phaseTitle || "Phase 1",
       currentPhaseNumber: activePhase?.phaseNumber || 1,
+      justUnlockedSlugs,
     }
   } catch {
     return null
@@ -107,18 +139,36 @@ function parseRoadmapData(): ParsedRoadmap | null {
 export default function RoadmapPage() {
   const [roadmap, setRoadmap] = useState<ParsedRoadmap | null>(null)
   const [mounted, setMounted] = useState(false)
-  // Mobile panel visibility toggles
   const [showLeftPanel,  setShowLeftPanel]  = useState(false)
   const [showRightPanel, setShowRightPanel] = useState(false)
 
-  useEffect(() => {
-    setRoadmap(parseRoadmapData())
-    setMounted(true)
+  const loadRoadmap = useCallback((prevUnlocked?: Set<string>) => {
+    const parsed = parseRoadmapData(prevUnlocked)
+    setRoadmap(parsed)
   }, [])
+
+  useEffect(() => {
+    loadRoadmap()
+    setMounted(true)
+
+    // Listen for storage events (fired from topic page after completion)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "generatedRoadmap") {
+        setRoadmap(prev => {
+          const prevSlugs = prev
+            ? new Set(prev.phases.flatMap(p => p.nodes.filter(n => n.status === "active").map(n => toSlug(n.name))))
+            : undefined
+          return parseRoadmapData(prevSlugs)
+        })
+      }
+    }
+
+    window.addEventListener("storage", handleStorage)
+    return () => window.removeEventListener("storage", handleStorage)
+  }, [loadRoadmap])
 
   if (!mounted) return null
 
-  // ── Empty state ────────────────────────────────────────────────────────────
   if (!roadmap) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
@@ -129,7 +179,8 @@ export default function RoadmapPage() {
         <p className="text-foreground-muted text-[13px] max-w-xs leading-relaxed">
           Complete the onboarding flow to generate your personalized AI learning roadmap.
         </p>
-        <a href="/onboarding"
+        <a
+          href="/onboarding"
           className="mt-6 px-5 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-accent-foreground text-[13px] font-semibold transition-colors"
         >
           Start Onboarding
@@ -140,8 +191,7 @@ export default function RoadmapPage() {
 
   return (
     <div className="relative min-h-screen">
-
-      {/* ── Ambient glow orbs ── */}
+      {/* Ambient glow orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="orb-glow absolute w-[500px] h-[500px] bg-accent/8 -top-32 -left-24" style={{ animationDelay: "0s" }} />
         <div className="orb-glow absolute w-[400px] h-[400px] bg-accent/5 top-1/2 -right-32"  style={{ animationDelay: "3.5s" }} />
@@ -149,7 +199,7 @@ export default function RoadmapPage() {
       </div>
 
       <PageWrapper maxWidth="full" className="relative z-10 !space-y-6">
-        {/* ── Page header ── */}
+        {/* Page header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -159,7 +209,9 @@ export default function RoadmapPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-mono text-[9px] text-accent uppercase tracking-widest font-semibold">Mission Control</span>
+              <span className="text-mono text-[9px] text-accent uppercase tracking-widest font-semibold">
+                Mission Control
+              </span>
             </div>
             <h1 className="text-display text-2xl sm:text-3xl text-foreground">
               Learning <span className="text-accent">Roadmap</span>
@@ -174,7 +226,7 @@ export default function RoadmapPage() {
           </div>
         </motion.div>
 
-        {/* ── Mobile panel toggles ── */}
+        {/* Mobile toggles */}
         <div className="flex gap-2 mb-4 lg:hidden">
           <button
             onClick={() => setShowLeftPanel(v => !v)}
@@ -190,10 +242,10 @@ export default function RoadmapPage() {
           </button>
         </div>
 
-        {/* ── 3-column layout ── */}
+        {/* 3-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_260px] xl:grid-cols-[280px_1fr_280px] gap-5">
 
-          {/* LEFT — Track Info Panel */}
+          {/* LEFT */}
           <div className={`${showLeftPanel ? "block" : "hidden"} lg:block`}>
             <TrackInfoPanel
               skill={roadmap.skill}
@@ -205,9 +257,8 @@ export default function RoadmapPage() {
             />
           </div>
 
-          {/* CENTER — Interactive Learning Graph */}
+          {/* CENTER — Learning Graph */}
           <div className="min-w-0">
-            {/* Center header */}
             <div className="glass-panel px-4 py-3 mb-5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-accent" />
@@ -226,10 +277,14 @@ export default function RoadmapPage() {
               </div>
             </div>
 
-            <LearningGraph phases={roadmap.phases} skill={roadmap.skill} />
+            <LearningGraph
+              phases={roadmap.phases}
+              skill={roadmap.skill}
+              justUnlockedSlugs={roadmap.justUnlockedSlugs}
+            />
           </div>
 
-          {/* RIGHT — AI Assistant Panel */}
+          {/* RIGHT */}
           <div className={`${showRightPanel ? "block" : "hidden"} lg:block`}>
             <AIAssistantPanel phases={roadmap.phases} skill={roadmap.skill} />
           </div>

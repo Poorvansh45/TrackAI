@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { TopicHero } from "@/components/topic/topic-hero"
 import { ResourcesSection } from "@/components/topic/resources-section"
 import { LearningChecklist } from "@/components/topic/learning-checklist"
@@ -9,6 +9,7 @@ import { QuickRecall } from "@/components/topic/quick-recall"
 import { ReExplainModal } from "@/components/topic/re-explain-modal"
 import { VerificationQuiz } from "@/components/topic/verification-quiz"
 import { TopicNav } from "@/components/topic/topic-nav"
+import { TopicCompletionModal } from "@/components/topic/topic-completion-modal"
 import { Loader2, Cpu } from "lucide-react"
 
 export interface TopicData {
@@ -41,6 +42,8 @@ export interface TopicData {
   }>
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 function humanize(slug: string): string {
   return slug
     .split("-")
@@ -48,19 +51,87 @@ function humanize(slug: string): string {
     .join(" ")
 }
 
-function buildTopicData(topicId: string, roadmapData: any): TopicData {
+/** Derive the next topic slug from localStorage roadmap data */
+function getNextTopic(currentTopicId: string): { id: string; title: string; duration: string } | null {
+  try {
+    const saved = localStorage.getItem("generatedRoadmap")
+    if (!saved) return null
+    const data = JSON.parse(saved)
+    const phases = data?.roadmap_result?.phases || []
+
+    // Flatten all topics into a sequence
+    const allTopics: string[] = []
+    for (const phase of phases) {
+      for (const topic of phase.topics || []) {
+        allTopics.push(topic)
+      }
+    }
+
+    // Find current index
+    const currentIdx = allTopics.findIndex((t) => {
+      const slug = t.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+      return slug === currentTopicId || t.toLowerCase() === currentTopicId.replace(/-/g, " ")
+    })
+
+    if (currentIdx < 0 || currentIdx >= allTopics.length - 1) return null
+
+    const next = allTopics[currentIdx + 1]
+    const nextSlug = next.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+
+    return { id: nextSlug, title: next, duration: "1.5 Hours" }
+  } catch {
+    return null
+  }
+}
+
+/** Persist progress to the backend */
+async function persistProgress(
+  topicId: string,
+  completedSubtopics: string[],
+  isCompleted: boolean,
+  nextTopicId?: string
+) {
+  try {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
+    await fetch(`${apiBase}/topic/progress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic_id: topicId,
+        completed_subtopics: completedSubtopics,
+        is_completed: isCompleted,
+        next_topic_id: nextTopicId || null,
+      }),
+    })
+  } catch {
+    // Silent fail — localStorage is the source of truth on the client
+  }
+}
+
+/** Fetch topic data from backend (with real resources) */
+async function fetchTopicData(topicId: string): Promise<TopicData | null> {
+  try {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
+    const res = await fetch(`${apiBase}/topic/${topicId}`, {
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+/** Fallback topic builder (when backend is unreachable) */
+function buildFallbackTopicData(topicId: string, roadmapData: any): TopicData {
   let topicName = ""
-  let skill = "Programming"
+  const skill = roadmapData?.skill || "Programming"
 
   if (roadmapData) {
-    skill = roadmapData?.skill || "Programming"
     const phases = roadmapData?.roadmap_result?.phases || []
     for (const phase of phases) {
       for (const topic of phase.topics || []) {
-        const slug = topic
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "")
+        const slug = topic.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
         if (slug === topicId || topic.toLowerCase() === topicId.replace(/-/g, " ")) {
           topicName = topic
           break
@@ -72,193 +143,207 @@ function buildTopicData(topicId: string, roadmapData: any): TopicData {
 
   if (!topicName) topicName = humanize(topicId)
 
-  const isVariables =
-    topicId === "variables" || topicName.toLowerCase().includes("variable")
-
   return {
     title: topicName,
     difficulty: "Beginner",
     estimated_time: "1.5 Hours",
-    overview: isVariables
-      ? "Variables are containers used to store data values. They allow programs to remember information and are one of the most fundamental concepts in any programming language. In Python, you create a variable the moment you first assign a value to it — no declaration needed."
-      : `${topicName} is a core concept in ${skill}. Understanding it deeply will unlock your ability to build real projects and advance confidently through your learning roadmap. This workspace is designed to take you from zero to confident in a single focused session.`,
-    why_it_matters: isVariables
-      ? [
-          "Used in every single Python program ever written",
-          "Without variables you cannot store user input",
-          "Required to perform any kind of calculation or logic",
-          "Foundation for building real applications",
-          "Essential for training machine learning models",
-        ]
-      : [
-          `${topicName} appears in virtually every ${skill} project`,
-          "Without this, you cannot progress to advanced topics",
-          "Mastering this accelerates all future learning",
-          "Used in real-world applications and technical interviews",
-          "Foundation for building scalable systems",
-        ],
-    subtopics: isVariables
-      ? [
-          "What Is A Variable",
-          "Variable Naming Rules",
-          "Assigning Values",
-          "Multiple Assignment",
-          "Variable Types",
-        ]
-      : [
-          `Introduction to ${topicName}`,
-          "Core Concepts",
-          "Practical Applications",
-          "Common Patterns",
-          "Advanced Usage",
-        ],
+    overview: `${topicName} is a core concept in ${skill}. This workspace will guide you through it with curated resources, a progress checklist, and on-demand AI explanations.`,
+    why_it_matters: [
+      `${topicName} appears in virtually every ${skill} project`,
+      "Without this, you cannot progress to advanced topics",
+      "Mastering this accelerates all future learning",
+      "Used in real-world applications and technical interviews",
+      "Foundation for building scalable systems",
+    ],
+    subtopics: [
+      `Introduction to ${topicName}`,
+      "Core Concepts",
+      "Practical Applications",
+      "Common Patterns",
+      "Advanced Usage",
+    ],
     resources: {
       videos: [
         {
           type: "core",
-          title: isVariables
-            ? "Python Variables — Complete Guide"
-            : `${topicName} — Core Concepts`,
-          creator: "CS Dojo",
-          duration: "12 min",
-          thumbnail: "https://img.youtube.com/vi/Z1Yd7upQsXY/mqdefault.jpg",
-          url: isVariables
-            ? "https://www.youtube.com/watch?v=Z1Yd7upQsXY"
-            : `https://www.youtube.com/results?search_query=${encodeURIComponent(topicName + " " + skill + " tutorial")}`,
+          title: `${topicName} — Core Tutorial`,
+          creator: "freeCodeCamp",
+          duration: "~20 min",
+          thumbnail: "https://img.youtube.com/vi/rfscVS0vtbw/mqdefault.jpg",
+          url: "https://www.youtube.com/watch?v=rfscVS0vtbw",
         },
         {
           type: "deep_dive",
-          title: isVariables
-            ? "Python Variables — Deep Dive Playlist"
-            : `${topicName} Full Course`,
+          title: `${topicName} — Deep Dive`,
           creator: "Corey Schafer",
-          duration: "45 min",
+          duration: "~35 min",
           thumbnail: "https://img.youtube.com/vi/YYXdXT2l-Gg/mqdefault.jpg",
-          url: isVariables
-            ? "https://www.youtube.com/watch?v=YYXdXT2l-Gg"
-            : `https://www.youtube.com/results?search_query=${encodeURIComponent(topicName + " full course")}`,
+          url: "https://www.youtube.com/watch?v=YYXdXT2l-Gg",
         },
         {
           type: "one_shot",
-          title: isVariables
-            ? "Python Variables in 5 Minutes"
-            : `${topicName} Quick Revision`,
-          creator: "Programming with Mosh",
-          duration: "5 min",
-          thumbnail: "https://img.youtube.com/vi/_uQrJ0TkZlc/mqdefault.jpg",
-          url: isVariables
-            ? "https://www.youtube.com/watch?v=_uQrJ0TkZlc"
-            : `https://www.youtube.com/results?search_query=${encodeURIComponent(topicName + " one shot revision")}`,
+          title: `${topicName} in 100 Seconds`,
+          creator: "Fireship",
+          duration: "~2 min",
+          thumbnail: "https://img.youtube.com/vi/Mus_vwhTCq0/mqdefault.jpg",
+          url: "https://www.youtube.com/watch?v=Mus_vwhTCq0",
         },
       ],
       reading: [
         {
           source: "W3Schools",
-          label: isVariables ? "Python Variables" : `${topicName} Guide`,
-          url: isVariables
-            ? "https://www.w3schools.com/python/python_variables.asp"
-            : `https://www.w3schools.com/search/search_result.asp?q=${encodeURIComponent(topicName)}`,
+          label: `${topicName} Guide`,
+          url: `https://www.w3schools.com/python/python_${topicId.replace(/-/g, "_")}.asp`,
           icon: "W",
         },
         {
           source: "GeeksForGeeks",
-          label: isVariables ? "Python Variables Article" : `${topicName} — GFG`,
-          url: isVariables
-            ? "https://www.geeksforgeeks.org/python-variables/"
-            : `https://www.geeksforgeeks.org/search/?q=${encodeURIComponent(topicName)}`,
+          label: `${topicName} — GFG`,
+          url: `https://www.geeksforgeeks.org/${topicId}/`,
           icon: "G",
         },
         {
           source: "Python Docs",
           label: "Official Documentation",
-          url: isVariables
-            ? "https://docs.python.org/3/reference/simple_stmts.html#assignment-statements"
-            : `https://docs.python.org/3/search.html?q=${encodeURIComponent(topicName)}`,
+          url: "https://docs.python.org/3/",
           icon: "P",
         },
         {
           source: "Real Python",
-          label: isVariables ? "Variables in Python" : `${topicName} Tutorial`,
-          url: isVariables
-            ? "https://realpython.com/python-variables/"
-            : `https://realpython.com/search?q=${encodeURIComponent(topicName)}`,
+          label: `${topicName} Tutorial`,
+          url: `https://realpython.com/search?q=${encodeURIComponent(topicName)}`,
           icon: "R",
         },
       ],
     },
-    summary: isVariables
-      ? [
-          "Variables store values and are created on assignment.",
-          "Python variables require no explicit type declaration.",
-          "Use meaningful, lowercase names with underscores.",
-          "Values can change during program execution.",
-          "Common types: int, float, str, bool, list, dict.",
-        ]
-      : [
-          `${topicName} is a fundamental concept in ${skill}.`,
-          "Practice consistently to build real intuition.",
-          "Understand the why, not just the syntax.",
-          "Apply concepts in small projects immediately.",
-          "Review key concepts every day until mastered.",
-        ],
-    key_concepts: isVariables
-      ? [
-          { term: "Variable", definition: "stores data" },
-          { term: "Assignment", definition: "sets a value" },
-          { term: "Dynamic Typing", definition: "type inferred automatically" },
-          { term: "Identifier", definition: "the variable name" },
-          { term: "Scope", definition: "where the variable exists" },
-        ]
-      : [
-          { term: topicName, definition: "core concept to master" },
-          { term: "Syntax", definition: "rules for writing valid code" },
-          { term: "Semantics", definition: "what the code actually means" },
-          { term: "Pattern", definition: "reusable solution template" },
-          { term: "Best Practice", definition: "proven approach used by pros" },
-        ],
+    summary: [
+      `${topicName} is a fundamental concept in programming.`,
+      "Practice consistently to build real intuition.",
+      "Understand the why, not just the syntax.",
+      "Apply concepts in small projects immediately.",
+      "Review key concepts every day until mastered.",
+    ],
+    key_concepts: [
+      { term: topicName, definition: "core concept to master" },
+      { term: "Syntax", definition: "rules for writing valid code" },
+      { term: "Semantics", definition: "what the code actually means" },
+      { term: "Pattern", definition: "reusable solution template" },
+      { term: "Best Practice", definition: "proven approach used by pros" },
+    ],
   }
 }
 
+// ─── Page ────────────────────────────────────────────────────────────────────
+
 export default function TopicPage() {
   const params = useParams()
+  const router = useRouter()
   const topicId = (params?.topicId as string) || "variables"
 
   const [topicData, setTopicData] = useState<TopicData | null>(null)
   const [completedSubtopics, setCompletedSubtopics] = useState<Set<string>>(new Set())
   const [showReExplain, setShowReExplain] = useState(false)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [nextTopic, setNextTopic] = useState<{ id: string; title: string; duration: string } | null>(null)
   const [activeSection, setActiveSection] = useState("intro")
   const [loading, setLoading] = useState(true)
 
+  // Track if completion modal has been shown this session (avoid re-showing on toggle)
+  const completionFiredRef = useRef(false)
+
+  // ── Load topic data ────────────────────────────────────────────────────────
   useEffect(() => {
-    const saved = localStorage.getItem("generatedRoadmap")
-    let roadmapData = null
-    try {
-      if (saved) roadmapData = JSON.parse(saved)
-    } catch {}
+    async function load() {
+      setLoading(true)
+      completionFiredRef.current = false
 
-    const data = buildTopicData(topicId, roadmapData)
-    setTopicData(data)
+      // 1. Try backend with real resources
+      const backendData = await fetchTopicData(topicId)
 
-    const savedProgress = localStorage.getItem(`topic_progress_${topicId}`)
-    if (savedProgress) {
+      // 2. Fall back to local build if backend unreachable
+      let savedRoadmap = null
       try {
-        setCompletedSubtopics(new Set(JSON.parse(savedProgress)))
+        const raw = localStorage.getItem("generatedRoadmap")
+        if (raw) savedRoadmap = JSON.parse(raw)
       } catch {}
+
+      const data = backendData ?? buildFallbackTopicData(topicId, savedRoadmap)
+      setTopicData(data)
+
+      // Restore saved progress
+      try {
+        const savedProgress = localStorage.getItem(`topic_progress_${topicId}`)
+        if (savedProgress) {
+          const parsed: string[] = JSON.parse(savedProgress)
+          setCompletedSubtopics(new Set(parsed))
+
+          // If already completed in a prior session, don't re-fire the modal
+          if (parsed.length === data.subtopics.length) {
+            completionFiredRef.current = true
+          }
+        }
+      } catch {}
+
+      // Determine next topic from roadmap
+      setNextTopic(getNextTopic(topicId))
+
+      setTimeout(() => setLoading(false), 380)
     }
 
-    setTimeout(() => setLoading(false), 400)
+    load()
   }, [topicId])
 
-  const toggleSubtopic = (subtopic: string) => {
-    setCompletedSubtopics((prev) => {
-      const next = new Set(prev)
-      if (next.has(subtopic)) next.delete(subtopic)
-      else next.add(subtopic)
-      localStorage.setItem(`topic_progress_${topicId}`, JSON.stringify([...next]))
-      return next
-    })
-  }
+  // ── Checklist toggle ──────────────────────────────────────────────────────
+  const toggleSubtopic = useCallback(
+    (subtopic: string) => {
+      setCompletedSubtopics((prev) => {
+        const next = new Set(prev)
+        if (next.has(subtopic)) {
+          next.delete(subtopic)
+          completionFiredRef.current = false // allow modal to fire again if un-checked
+        } else {
+          next.add(subtopic)
+        }
 
+        const arr = [...next]
+        localStorage.setItem(`topic_progress_${topicId}`, JSON.stringify(arr))
+
+        // Check if newly completed
+        if (topicData && next.size === topicData.subtopics.length && !completionFiredRef.current) {
+          completionFiredRef.current = true
+
+          // Trigger completion flow after short delay (let the last check-animation finish)
+          setTimeout(() => {
+            setShowCompletionModal(true)
+
+            // Persist to backend
+            persistProgress(topicId, arr, true, nextTopic?.id)
+
+            // Update roadmap node status in localStorage
+            updateRoadmapNodeStatus(topicId, nextTopic?.id)
+          }, 600)
+        } else {
+          // Save partial progress to backend
+          persistProgress(topicId, arr, false)
+        }
+
+        return next
+      })
+    },
+    [topicId, topicData, nextTopic]
+  )
+
+  // ── Handle "Continue Learning" ─────────────────────────────────────────────
+  const handleContinue = useCallback(() => {
+    setShowCompletionModal(false)
+    if (nextTopic) {
+      router.push(`/topic/${nextTopic.id}`)
+    } else {
+      router.push("/dashboard/roadmap")
+    }
+  }, [nextTopic, router])
+
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (loading || !topicData) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -278,8 +363,7 @@ export default function TopicPage() {
   }
 
   const allMastered =
-    completedSubtopics.size === topicData.subtopics.length &&
-    topicData.subtopics.length > 0
+    completedSubtopics.size === topicData.subtopics.length && topicData.subtopics.length > 0
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -300,8 +384,7 @@ export default function TopicPage() {
         <div
           className="orb-glow absolute w-[700px] h-[700px]"
           style={{
-            background:
-              "radial-gradient(circle, oklch(0.62 0.20 275 / 0.07), transparent 70%)",
+            background: "radial-gradient(circle, oklch(0.62 0.20 275 / 0.07), transparent 70%)",
             top: "-250px",
             right: "-150px",
             animationDelay: "0s",
@@ -310,8 +393,7 @@ export default function TopicPage() {
         <div
           className="orb-glow absolute w-[500px] h-[500px]"
           style={{
-            background:
-              "radial-gradient(circle, oklch(0.55 0.15 200 / 0.05), transparent 70%)",
+            background: "radial-gradient(circle, oklch(0.55 0.15 200 / 0.05), transparent 70%)",
             bottom: "0",
             left: "-150px",
             animationDelay: "3.5s",
@@ -319,7 +401,7 @@ export default function TopicPage() {
         />
       </div>
 
-      {/* Top navigation bar */}
+      {/* Navigation bar */}
       <TopicNav
         topicTitle={topicData.title}
         completedCount={completedSubtopics.size}
@@ -330,12 +412,10 @@ export default function TopicPage() {
 
       {/* Main content */}
       <div className="relative z-10 max-w-[860px] mx-auto px-5 lg:px-8 pt-24 pb-24 space-y-8">
+
         {/* S1 — Hero */}
         <section id="section-intro">
-          <TopicHero
-            topicData={topicData}
-            onReExplain={() => setShowReExplain(true)}
-          />
+          <TopicHero topicData={topicData} onReExplain={() => setShowReExplain(true)} />
         </section>
 
         {/* S2 — Resources */}
@@ -355,10 +435,7 @@ export default function TopicPage() {
 
         {/* S4 — Quick Recall */}
         <section id="section-recall">
-          <QuickRecall
-            summary={topicData.summary}
-            keyConcepts={topicData.key_concepts}
-          />
+          <QuickRecall summary={topicData.summary} keyConcepts={topicData.key_concepts} />
         </section>
 
         {/* S5 — AI Re-Explain CTA */}
@@ -372,7 +449,7 @@ export default function TopicPage() {
                 <Cpu className="w-3.5 h-3.5 text-accent" />
               </div>
               <span>
-                I Didn't Understand This
+                I Didn&apos;t Understand This
                 <span className="text-foreground-subtle ml-1.5">— Ask AI to Re-Explain</span>
               </span>
             </button>
@@ -387,11 +464,62 @@ export default function TopicPage() {
 
       {/* Re-Explain Modal */}
       {showReExplain && (
-        <ReExplainModal
-          topicTitle={topicData.title}
-          onClose={() => setShowReExplain(false)}
-        />
+        <ReExplainModal topicTitle={topicData.title} onClose={() => setShowReExplain(false)} />
       )}
+
+      {/* Topic Completion Modal */}
+      <TopicCompletionModal
+        isOpen={showCompletionModal}
+        topicTitle={topicData.title}
+        nextTopicTitle={nextTopic?.title}
+        nextTopicDuration={nextTopic?.duration}
+        xpEarned={100}
+        onContinue={handleContinue}
+        onClose={() => setShowCompletionModal(false)}
+      />
     </div>
   )
+}
+
+// ─── Roadmap node updater ─────────────────────────────────────────────────
+/**
+ * After completing a topic, update localStorage roadmap state so the
+ * roadmap graph re-renders with the correct node statuses:
+ *   completed topic → status: "completed", progress: 100
+ *   next topic      → status: "active"
+ */
+function updateRoadmapNodeStatus(completedTopicId: string, nextTopicId?: string) {
+  try {
+    const raw = localStorage.getItem("generatedRoadmap")
+    if (!raw) return
+    const data = JSON.parse(raw)
+    const phases = data?.roadmap_result?.phases || []
+
+    let foundCompleted = false
+    let foundNext = false
+
+    for (const phase of phases) {
+      for (const topic of phase.topics || []) {
+        const slug = topic.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+
+        if (slug === completedTopicId) {
+          // Mark completed
+          if (!phase._nodeStatus) phase._nodeStatus = {}
+          phase._nodeStatus[topic] = "completed"
+          foundCompleted = true
+        } else if (nextTopicId && slug === nextTopicId && foundCompleted && !foundNext) {
+          // Unlock next
+          if (!phase._nodeStatus) phase._nodeStatus = {}
+          phase._nodeStatus[topic] = "active"
+          foundNext = true
+        }
+      }
+    }
+
+    // Persist updated roadmap
+    localStorage.setItem("generatedRoadmap", JSON.stringify(data))
+
+    // Emit a storage event so the roadmap page can react if open in another tab
+    window.dispatchEvent(new StorageEvent("storage", { key: "generatedRoadmap" }))
+  } catch {}
 }

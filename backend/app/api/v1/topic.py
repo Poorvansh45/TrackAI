@@ -1,15 +1,17 @@
 """
 Topic Learning Workspace API
 
-GET  /api/v1/topic/{topic_id}   — Returns full topic data
-POST /api/v1/topic/progress      — Save checklist progress  
-POST /api/v1/topic/explain       — AI re-explain (Gemini Flash via get_llm)
+GET  /api/v1/topic/{topic_id}        — Returns full topic data with REAL resources
+POST /api/v1/topic/progress           — Save checklist progress + unlock next topic
+POST /api/v1/topic/explain            — AI re-explain (Gemini Flash via get_llm)
+GET  /api/v1/topic/{topic_id}/progress — Get saved progress for a topic
 """
 
 import logging
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import datetime
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -59,7 +61,27 @@ class TopicResponse(BaseModel):
 class ProgressRequest(BaseModel):
     topic_id: str = Field(description="Topic slug e.g. 'variables'")
     completed_subtopics: list[str] = Field(description="List of completed subtopic names")
+    is_completed: bool = Field(default=False, description="Whether topic is fully mastered")
     user_id: Optional[str] = None
+    next_topic_id: Optional[str] = Field(default=None, description="Next topic slug to unlock")
+
+
+class ProgressResponse(BaseModel):
+    success: bool
+    topic_id: str
+    completed_count: int
+    is_completed: bool
+    xp_earned: int
+    next_topic_unlocked: Optional[str] = None
+
+
+class TopicProgressState(BaseModel):
+    topic_id: str
+    completed_subtopics: list[str]
+    is_completed: bool
+    progress_pct: int
+    xp_earned: int
+    completed_at: Optional[str] = None
 
 
 class ExplainRequest(BaseModel):
@@ -72,7 +94,8 @@ class ExplainResponse(BaseModel):
     mode: str
 
 
-# ─── Static topic data ──────────────────────────────────────────────────────
+# ─── Static topic content database ──────────────────────────────────────────
+# Resources are now served by app.services.resources — only content here
 
 TOPIC_DB: dict[str, dict] = {
     "variables": {
@@ -99,60 +122,6 @@ TOPIC_DB: dict[str, dict] = {
             "Multiple Assignment",
             "Variable Types",
         ],
-        "resources": {
-            "videos": [
-                {
-                    "type": "core",
-                    "title": "Python Variables — Complete Guide",
-                    "creator": "CS Dojo",
-                    "duration": "12 min",
-                    "thumbnail": "https://img.youtube.com/vi/Z1Yd7upQsXY/mqdefault.jpg",
-                    "url": "https://www.youtube.com/watch?v=Z1Yd7upQsXY",
-                },
-                {
-                    "type": "deep_dive",
-                    "title": "Python Variables Deep Dive Playlist",
-                    "creator": "Corey Schafer",
-                    "duration": "45 min",
-                    "thumbnail": "https://img.youtube.com/vi/YYXdXT2l-Gg/mqdefault.jpg",
-                    "url": "https://www.youtube.com/watch?v=YYXdXT2l-Gg",
-                },
-                {
-                    "type": "one_shot",
-                    "title": "Python Variables in 5 Minutes",
-                    "creator": "Programming with Mosh",
-                    "duration": "5 min",
-                    "thumbnail": "https://img.youtube.com/vi/_uQrJ0TkZlc/mqdefault.jpg",
-                    "url": "https://www.youtube.com/watch?v=_uQrJ0TkZlc",
-                },
-            ],
-            "reading": [
-                {
-                    "source": "W3Schools",
-                    "label": "Python Variables",
-                    "url": "https://www.w3schools.com/python/python_variables.asp",
-                    "icon": "W",
-                },
-                {
-                    "source": "GeeksForGeeks",
-                    "label": "Python Variables Article",
-                    "url": "https://www.geeksforgeeks.org/python-variables/",
-                    "icon": "G",
-                },
-                {
-                    "source": "Python Docs",
-                    "label": "Official Documentation",
-                    "url": "https://docs.python.org/3/reference/simple_stmts.html#assignment-statements",
-                    "icon": "P",
-                },
-                {
-                    "source": "Real Python",
-                    "label": "Variables in Python",
-                    "url": "https://realpython.com/python-variables/",
-                    "icon": "R",
-                },
-            ],
-        },
         "summary": [
             "Variables store values and are created on assignment.",
             "Python variables require no explicit type declaration.",
@@ -167,7 +136,85 @@ TOPIC_DB: dict[str, dict] = {
             {"term": "Identifier",     "definition": "the variable name"},
             {"term": "Scope",          "definition": "where the variable exists"},
         ],
-    }
+    },
+    "data-types": {
+        "title": "Data Types",
+        "difficulty": "Beginner",
+        "estimated_time": "1.5 Hours",
+        "overview": (
+            "Data types define what kind of value a variable holds and what operations "
+            "can be performed on it. Python has built-in types like int, float, str, "
+            "bool, list, tuple, dict and set. Understanding types prevents bugs and "
+            "helps you write expressive, efficient code."
+        ),
+        "why_it_matters": [
+            "Every variable has a type — knowing it prevents runtime errors",
+            "Type errors are one of the most common bugs in Python",
+            "Choosing the right type makes your code faster and clearer",
+            "Required for data processing, APIs, and machine learning",
+            "Foundation for understanding Python's type system",
+        ],
+        "subtopics": [
+            "Numeric Types",
+            "String Type",
+            "Boolean Type",
+            "List and Tuple",
+            "Dict and Set",
+        ],
+        "summary": [
+            "Python has dynamic typing — types are inferred at runtime.",
+            "Core types: int, float, str, bool, list, tuple, dict, set.",
+            "Use type() to inspect a variable's type.",
+            "Type casting converts between types: int('5') → 5.",
+            "Mutable types (list, dict) can be changed; tuples cannot.",
+        ],
+        "key_concepts": [
+            {"term": "int",   "definition": "whole number"},
+            {"term": "float", "definition": "decimal number"},
+            {"term": "str",   "definition": "text sequence"},
+            {"term": "bool",  "definition": "True or False"},
+            {"term": "list",  "definition": "ordered mutable collection"},
+        ],
+    },
+    "functions": {
+        "title": "Functions",
+        "difficulty": "Beginner",
+        "estimated_time": "2 Hours",
+        "overview": (
+            "Functions are reusable blocks of code that perform a specific task. "
+            "They reduce repetition, improve readability, and make code easier to test. "
+            "Python functions are defined with 'def', can accept parameters, and "
+            "optionally return a value."
+        ),
+        "why_it_matters": [
+            "Functions are the #1 tool for writing clean, reusable code",
+            "Every Python framework and library is built from functions",
+            "Without functions you would repeat code endlessly",
+            "Required to understand classes, decorators, and callbacks",
+            "Used in every real-world Python project",
+        ],
+        "subtopics": [
+            "Defining Functions",
+            "Parameters and Arguments",
+            "Return Values",
+            "Default Parameters",
+            "Lambda Functions",
+        ],
+        "summary": [
+            "Functions are defined with 'def name(params):'",
+            "Call a function by name with parentheses: my_func()",
+            "Parameters receive input; return sends output back.",
+            "Default parameters make arguments optional.",
+            "Lambda is a one-line anonymous function.",
+        ],
+        "key_concepts": [
+            {"term": "def",        "definition": "defines a function"},
+            {"term": "parameter",  "definition": "input variable"},
+            {"term": "return",     "definition": "outputs a value"},
+            {"term": "argument",   "definition": "value passed to function"},
+            {"term": "lambda",     "definition": "inline anonymous function"},
+        ],
+    },
 }
 
 
@@ -230,37 +277,111 @@ FALLBACK_EXPLANATIONS: dict[str, str] = {
 @router.get(
     "/{topic_id}",
     response_model=TopicResponse,
-    summary="Get full topic workspace data",
+    summary="Get full topic workspace data with real resources",
 )
 async def get_topic(topic_id: str):
     topic_id = topic_id.lower().strip()
-    data = TOPIC_DB.get(topic_id)
 
+    # Get base content
+    data = TOPIC_DB.get(topic_id)
     if not data:
         human_name = " ".join(w.capitalize() for w in topic_id.split("-"))
         data = _build_generic_topic(topic_id, human_name)
 
-    return TopicResponse(**data)
+    # Fetch REAL resources (static cache → MongoDB → LLM)
+    from app.services.resources import get_topic_resources
+    skill = "Python"  # Default; could be inferred from track context in future
+    resources = await get_topic_resources(topic_id, data["title"], skill)
+
+    # Merge real resources into topic data
+    data_with_resources = {**data, "resources": resources}
+
+    return TopicResponse(**data_with_resources)
 
 
 @router.post(
     "/progress",
-    summary="Save topic checklist progress",
+    response_model=ProgressResponse,
+    summary="Save topic checklist progress + unlock next topic",
     status_code=status.HTTP_200_OK,
 )
 async def save_progress(payload: ProgressRequest):
+    total_subtopics = 5  # default
+    topic_data = TOPIC_DB.get(payload.topic_id.lower())
+    if topic_data:
+        total_subtopics = len(topic_data.get("subtopics", []))
+
+    completed_count = len(payload.completed_subtopics)
+    progress_pct = round((completed_count / total_subtopics) * 100) if total_subtopics > 0 else 0
+    xp_earned = 100 if payload.is_completed else 0
+
+    # Persist to MongoDB
+    await _persist_progress(
+        topic_id=payload.topic_id,
+        user_id=payload.user_id or "anon",
+        completed_subtopics=payload.completed_subtopics,
+        is_completed=payload.is_completed,
+        progress_pct=progress_pct,
+        xp_earned=xp_earned,
+    )
+
+    # Unlock next topic if completed
+    next_unlocked = None
+    if payload.is_completed and payload.next_topic_id:
+        await _unlock_topic(payload.next_topic_id, payload.user_id or "anon")
+        next_unlocked = payload.next_topic_id
+        logger.info("[Progress] Unlocked next topic: %s for user: %s", next_unlocked, payload.user_id)
+
     logger.info(
-        "Progress | topic=%s completed=%s user=%s",
+        "Progress | topic=%s completed=%s/%s xp=%d user=%s",
         payload.topic_id,
-        payload.completed_subtopics,
+        completed_count,
+        total_subtopics,
+        xp_earned,
         payload.user_id or "anon",
     )
-    # TODO: persist to MongoDB when auth is wired
-    return {
-        "success": True,
-        "topic_id": payload.topic_id,
-        "completed_count": len(payload.completed_subtopics),
-    }
+
+    return ProgressResponse(
+        success=True,
+        topic_id=payload.topic_id,
+        completed_count=completed_count,
+        is_completed=payload.is_completed,
+        xp_earned=xp_earned,
+        next_topic_unlocked=next_unlocked,
+    )
+
+
+@router.get(
+    "/{topic_id}/progress",
+    response_model=TopicProgressState,
+    summary="Get saved progress for a topic",
+)
+async def get_progress(topic_id: str, user_id: Optional[str] = None):
+    topic_id = topic_id.lower().strip()
+    uid = user_id or "anon"
+
+    try:
+        from app.core.database import get_database
+        db = get_database()
+        if db is None:
+            return _empty_progress(topic_id)
+
+        coll = db["topic_progress"]
+        doc = await coll.find_one({"topic_id": topic_id, "user_id": uid})
+        if not doc:
+            return _empty_progress(topic_id)
+
+        return TopicProgressState(
+            topic_id=topic_id,
+            completed_subtopics=doc.get("completed_subtopics", []),
+            is_completed=doc.get("is_completed", False),
+            progress_pct=doc.get("progress_pct", 0),
+            xp_earned=doc.get("xp_earned", 0),
+            completed_at=doc.get("completed_at"),
+        )
+    except Exception as exc:
+        logger.warning("[Progress] Get progress failed: %s", exc)
+        return _empty_progress(topic_id)
 
 
 @router.post(
@@ -286,7 +407,6 @@ async def explain_topic(payload: ExplainRequest):
     except Exception as exc:
         logger.warning("LLM explain failed for '%s' mode=%s: %s", payload.topic, mode, exc)
         fallback = FALLBACK_EXPLANATIONS.get(mode, FALLBACK_EXPLANATIONS["simplify"])
-        # Lightly adapt fallback to the actual topic if it's not Variables
         if "variables" not in payload.topic.lower():
             fallback = (
                 f"Here's a concise explanation of **{payload.topic}**:\n\n"
@@ -299,8 +419,81 @@ async def explain_topic(payload: ExplainRequest):
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
+async def _persist_progress(
+    topic_id: str,
+    user_id: str,
+    completed_subtopics: list[str],
+    is_completed: bool,
+    progress_pct: int,
+    xp_earned: int,
+) -> None:
+    try:
+        from app.core.database import get_database
+        db = get_database()
+        if db is None:
+            return
+
+        coll = db["topic_progress"]
+        update_doc = {
+            "$set": {
+                "topic_id": topic_id,
+                "user_id": user_id,
+                "completed_subtopics": completed_subtopics,
+                "is_completed": is_completed,
+                "progress_pct": progress_pct,
+                "xp_earned": xp_earned,
+                "updated_at": datetime.utcnow(),
+            }
+        }
+        if is_completed:
+            update_doc["$set"]["completed_at"] = datetime.utcnow().isoformat()
+
+        await coll.update_one(
+            {"topic_id": topic_id, "user_id": user_id},
+            update_doc,
+            upsert=True,
+        )
+    except Exception as exc:
+        logger.warning("[Progress] Persist failed: %s", exc)
+
+
+async def _unlock_topic(topic_id: str, user_id: str) -> None:
+    """Mark a topic as unlocked (active) in the user's roadmap state."""
+    try:
+        from app.core.database import get_database
+        db = get_database()
+        if db is None:
+            return
+
+        coll = db["topic_unlocks"]
+        await coll.update_one(
+            {"topic_id": topic_id, "user_id": user_id},
+            {
+                "$set": {
+                    "topic_id": topic_id,
+                    "user_id": user_id,
+                    "unlocked_at": datetime.utcnow(),
+                    "status": "active",
+                }
+            },
+            upsert=True,
+        )
+    except Exception as exc:
+        logger.warning("[Unlock] Failed to unlock topic %s: %s", topic_id, exc)
+
+
+def _empty_progress(topic_id: str) -> TopicProgressState:
+    return TopicProgressState(
+        topic_id=topic_id,
+        completed_subtopics=[],
+        is_completed=False,
+        progress_pct=0,
+        xp_earned=0,
+        completed_at=None,
+    )
+
+
 async def _llm_explain(prompt: str) -> str:
-    """Call the shared LLM (Gemini + Groq fallback) asynchronously."""
     import asyncio
     from langchain_core.messages import HumanMessage
 
@@ -308,7 +501,6 @@ async def _llm_explain(prompt: str) -> str:
         from app.tracks.llm.gemini import get_llm
         llm = get_llm()
         response = llm.invoke([HumanMessage(content=prompt)])
-        # LangChain ChatModel returns an AIMessage
         return response.content if hasattr(response, "content") else str(response)
 
     loop = asyncio.get_event_loop()
@@ -316,7 +508,6 @@ async def _llm_explain(prompt: str) -> str:
 
 
 def _build_generic_topic(topic_id: str, human_name: str) -> dict:
-    """Generate a generic topic data dict for any unknown topic slug."""
     return {
         "title": human_name,
         "difficulty": "Beginner",
@@ -340,60 +531,6 @@ def _build_generic_topic(topic_id: str, human_name: str) -> dict:
             "Common Patterns",
             "Advanced Usage",
         ],
-        "resources": {
-            "videos": [
-                {
-                    "type": "core",
-                    "title": f"{human_name} — Core Concepts",
-                    "creator": "freeCodeCamp",
-                    "duration": "~15 min",
-                    "thumbnail": "https://img.youtube.com/vi/rfscVS0vtbw/mqdefault.jpg",
-                    "url": f"https://www.youtube.com/results?search_query={topic_id.replace('-', '+')}+tutorial",
-                },
-                {
-                    "type": "deep_dive",
-                    "title": f"{human_name} Deep Dive",
-                    "creator": "Traversy Media",
-                    "duration": "~40 min",
-                    "thumbnail": "https://img.youtube.com/vi/YYXdXT2l-Gg/mqdefault.jpg",
-                    "url": f"https://www.youtube.com/results?search_query={topic_id.replace('-', '+')}+full+course",
-                },
-                {
-                    "type": "one_shot",
-                    "title": f"{human_name} in 5 Minutes",
-                    "creator": "Fireship",
-                    "duration": "~5 min",
-                    "thumbnail": "https://img.youtube.com/vi/_uQrJ0TkZlc/mqdefault.jpg",
-                    "url": f"https://www.youtube.com/results?search_query={topic_id.replace('-', '+')}+one+shot",
-                },
-            ],
-            "reading": [
-                {
-                    "source": "W3Schools",
-                    "label": f"{human_name} Guide",
-                    "url": f"https://www.w3schools.com/search/search_result.asp?q={topic_id}",
-                    "icon": "W",
-                },
-                {
-                    "source": "GeeksForGeeks",
-                    "label": f"{human_name} — GFG",
-                    "url": f"https://www.geeksforgeeks.org/search/?q={topic_id}",
-                    "icon": "G",
-                },
-                {
-                    "source": "Python Docs",
-                    "label": "Official Documentation",
-                    "url": f"https://docs.python.org/3/search.html?q={topic_id}",
-                    "icon": "P",
-                },
-                {
-                    "source": "Real Python",
-                    "label": f"{human_name} Tutorial",
-                    "url": f"https://realpython.com/search?q={topic_id}",
-                    "icon": "R",
-                },
-            ],
-        },
         "summary": [
             f"{human_name} is a fundamental concept in programming.",
             "Practice consistently to build real intuition.",

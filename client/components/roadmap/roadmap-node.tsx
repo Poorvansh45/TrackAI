@@ -1,8 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
-import { CheckCircle2, Lock, Play, Zap, Clock, BarChart2, ArrowRight } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { CheckCircle2, Lock, Play, Zap, Clock, BarChart2, ArrowRight, Sparkles } from "lucide-react"
 
 export type NodeStatus = "completed" | "active" | "locked"
 
@@ -21,7 +21,8 @@ export interface RoadmapNodeData {
 interface RoadmapNodeProps {
   node: RoadmapNodeData
   index: number           // global stagger index
-  isLast: boolean         // don't render connector after last node in phase
+  isLast: boolean
+  justUnlocked?: boolean  // true = trigger unlock animation
 }
 
 const DIFFICULTY_CLASS: Record<string, string> = {
@@ -30,7 +31,6 @@ const DIFFICULTY_CLASS: Record<string, string> = {
   Advanced:     "badge-advanced",
 }
 
-/** Convert a topic name to a URL-safe slug */
 function toSlug(name: string): string {
   return name
     .toLowerCase()
@@ -40,7 +40,7 @@ function toSlug(name: string): string {
     .replace(/^-|-$/g, "")
 }
 
-export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
+export function RoadmapNode({ node, index, isLast, justUnlocked = false }: RoadmapNodeProps) {
   const router = useRouter()
   const isCompleted = node.status === "completed"
   const isActive    = node.status === "active"
@@ -48,8 +48,7 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
 
   const handleContinue = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const slug = toSlug(node.name)
-    router.push(`/topic/${slug}`)
+    router.push(`/topic/${toSlug(node.name)}`)
   }
 
   return (
@@ -68,35 +67,85 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
           ${isLocked    ? "opacity-45 cursor-not-allowed" : "cursor-pointer hover:scale-[1.015] hover:shadow-xl"}
         `}
       >
-        {/* Subtle inner scanlines on active node */}
+        {/* Scanlines on active */}
         {isActive && (
           <div className="absolute inset-0 scanlines rounded-xl pointer-events-none opacity-40" />
         )}
 
+        {/* Unlock flash overlay — fires once when node is freshly unlocked */}
+        <AnimatePresence>
+          {justUnlocked && (
+            <motion.div
+              key="unlock-flash"
+              initial={{ opacity: 0.5 }}
+              animate={{ opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              className="absolute inset-0 rounded-xl pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(ellipse at 50% 40%, oklch(0.62 0.20 275 / 0.28), transparent 70%)",
+              }}
+            />
+          )}
+        </AnimatePresence>
+
         <div className="relative z-10 flex items-start gap-3">
-          {/* Status indicator orb */}
+          {/* Status orb */}
           <div className="flex-shrink-0 mt-0.5">
             {isCompleted ? (
-              <div className="w-7 h-7 rounded-full bg-success/20 border border-success/50 flex items-center justify-center">
+              <motion.div
+                initial={justUnlocked ? { scale: 0.6 } : false}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 18 }}
+                className="w-7 h-7 rounded-full bg-success/20 border border-success/50 flex items-center justify-center"
+              >
                 <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-              </div>
+              </motion.div>
             ) : isActive ? (
               <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/60 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
+                {justUnlocked ? (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 350, damping: 16, delay: 0.1 }}
+                    className="w-2.5 h-2.5 rounded-full bg-accent"
+                  />
+                ) : (
+                  <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
+                )}
               </div>
             ) : (
               <div className="w-7 h-7 rounded-full bg-surface-2 border border-border/40 flex items-center justify-center">
-                <Lock className="w-3 h-3 text-foreground-subtle/50" />
+                <AnimatePresence mode="wait">
+                  {justUnlocked ? (
+                    <motion.div
+                      key="unlocking"
+                      initial={{ rotate: -20, opacity: 0, scale: 0.7 }}
+                      animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                      transition={{ type: "spring", stiffness: 340, damping: 18 }}
+                    >
+                      <Sparkles className="w-3 h-3 text-accent" />
+                    </motion.div>
+                  ) : (
+                    <motion.div key="locked">
+                      <Lock className="w-3 h-3 text-foreground-subtle/50" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </div>
 
-          {/* Main content */}
+          {/* Content */}
           <div className="flex-1 min-w-0">
-            {/* Top row: name + XP badge */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <h3 className={`text-[13px] font-semibold leading-tight ${
-                isLocked ? "text-foreground-subtle" : isCompleted ? "text-foreground-muted" : "text-foreground"
+                isLocked && !justUnlocked
+                  ? "text-foreground-subtle"
+                  : isCompleted
+                  ? "text-foreground-muted"
+                  : "text-foreground"
               }`}>
                 {node.name}
               </h3>
@@ -107,7 +156,6 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
               )}
             </div>
 
-            {/* Meta row: difficulty + duration */}
             <div className="flex items-center gap-2 mb-2.5">
               <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${DIFFICULTY_CLASS[node.difficulty]}`}>
                 {node.difficulty}
@@ -120,6 +168,16 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
                   ✓ MASTERED
                 </span>
               )}
+              {justUnlocked && isActive && (
+                <motion.span
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-mono text-[9px] text-accent font-semibold ml-auto"
+                >
+                  ★ UNLOCKED
+                </motion.span>
+              )}
             </div>
 
             {/* Progress bar */}
@@ -129,9 +187,7 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
                   <div className="flex items-center gap-1 text-mono text-[8px] text-foreground-subtle">
                     <BarChart2 className="w-2.5 h-2.5" />Progress
                   </div>
-                  <span className="text-mono text-[8px] text-foreground-subtle">
-                    {node.progress}%
-                  </span>
+                  <span className="text-mono text-[8px] text-foreground-subtle">{node.progress}%</span>
                 </div>
                 <div className="h-1 bg-surface-3 rounded-full overflow-hidden">
                   <motion.div
@@ -149,10 +205,11 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
               </div>
             )}
 
-            {/* CTA button — routes to /topic/[slug] */}
+            {/* CTA */}
             {!isLocked && (
-              <button
+              <motion.button
                 onClick={handleContinue}
+                whileTap={{ scale: 0.97 }}
                 className={`
                   flex items-center gap-1.5 text-mono text-[10px] font-semibold px-3 py-1.5 rounded-md
                   transition-all duration-200
@@ -163,27 +220,24 @@ export function RoadmapNode({ node, index, isLast }: RoadmapNodeProps) {
                 `}
               >
                 {isCompleted ? (
-                  <>
-                    <CheckCircle2 className="w-3 h-3" />
-                    Review
-                  </>
+                  <><CheckCircle2 className="w-3 h-3" />Review</>
                 ) : (
-                  <>
-                    <Play className="w-3 h-3 fill-current" />
-                    Continue
-                    <ArrowRight className="w-3 h-3" />
-                  </>
+                  <><Play className="w-3 h-3 fill-current" />Continue<ArrowRight className="w-3 h-3" /></>
                 )}
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
       </motion.div>
 
-      {/* ── Connector line between nodes ── */}
+      {/* ── Connector line ── */}
       {!isLast && (
         <div className="flex flex-col items-center py-1">
-          <div className={`node-connector h-8 ${isCompleted ? "node-connector-done" : ""}`} />
+          <motion.div
+            className={`node-connector h-8 ${isCompleted ? "node-connector-done" : ""}`}
+            animate={isCompleted ? { opacity: [0.5, 1, 0.5] } : {}}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          />
           <div className={`w-1.5 h-1.5 rounded-full ${isCompleted ? "bg-success/60" : "bg-accent/30"}`} />
           <div className={`node-connector h-4 ${isCompleted ? "node-connector-done" : ""}`} />
         </div>
