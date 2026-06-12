@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { CheckCircle2, Lock, ChevronRight, Play } from "lucide-react"
 import Link from "next/link"
+import { useActiveTopic } from "@/hooks/use-active-topic"
 
 interface Node {
   id: string
@@ -24,59 +24,63 @@ function toSlug(name: string): string {
     .replace(/^-|-$/g, "")
 }
 
+function isCompleted(topicName: string, phase: any): boolean {
+  if (phase._nodeStatus?.[topicName] === "completed") return true
+  try {
+    const slug = toSlug(topicName)
+    const raw = localStorage.getItem(`topic_progress_${slug}`)
+    if (raw) return JSON.parse(raw).length >= 5
+  } catch {}
+  return false
+}
+
 export function RoadmapCard() {
   const router = useRouter()
-  const [nodes, setNodes] = useState<Node[]>([
-    { id: "RD-001", name: "Loading...", slug: "", status: "locked", xp: 0 },
-  ])
-  const [skillLabel, setSkillLabel] = useState("Loading Track...")
+  const { activeTopic } = useActiveTopic()
 
-  useEffect(() => {
-    const saved = localStorage.getItem("generatedRoadmap")
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (parsed?.skill) setSkillLabel(`${parsed.skill} Track`)
+  // Build node list from localStorage roadmap, using activeTopic as the live marker
+  let nodes: Node[] = []
+  let skillLabel = "Loading Track..."
 
-        if (parsed?.roadmap_result?.phases) {
-          const phases = parsed.roadmap_result.phases
-          const newNodes: Node[] = []
-          let foundCurrent = false
-          let count = 1
+  try {
+    const raw = localStorage.getItem("generatedRoadmap")
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.skill) skillLabel = `${parsed.skill} Track`
 
-          for (const p of phases) {
-            for (const topic of p.topics || []) {
-              const isCurrent = !foundCurrent
-              if (isCurrent) foundCurrent = true
-              const slug = toSlug(topic)
+      if (parsed?.roadmap_result?.phases) {
+        const phases = parsed.roadmap_result.phases
+        let count = 1
 
-              // Check stored progress
-              let progress = 0
-              const stored = localStorage.getItem(`topic_progress_${slug}`)
-              if (stored) {
-                try { progress = JSON.parse(stored).length } catch {}
-              }
+        for (const phase of phases) {
+          for (const topic of phase.topics || []) {
+            const slug = toSlug(topic)
+            const completed = isCompleted(topic, phase)
+            const isCurrent = slug === activeTopic?.slug
 
-              newNodes.push({
-                id: `RD-${String(count).padStart(3, "0")}`,
-                name: topic,
-                slug,
-                status: isCurrent ? "current" : "locked",
-                xp: 100 * count,
-                progress: isCurrent ? progress : undefined,
-              })
-              count++
-              if (newNodes.length >= 5) break
+            let progress = 0
+            if (isCurrent && activeTopic) {
+              progress = activeTopic.progress
+            } else if (completed) {
+              progress = 100
             }
-            if (newNodes.length >= 5) break
+
+            nodes.push({
+              id: `RD-${String(count).padStart(3, "0")}`,
+              name: topic,
+              slug,
+              status: completed ? "completed" : isCurrent ? "current" : "locked",
+              xp: 100 * count,
+              progress: isCurrent ? progress : completed ? 100 : undefined,
+            })
+            count++
+            if (nodes.length >= 5) break
           }
-          if (newNodes.length > 0) setNodes(newNodes)
+          if (nodes.length >= 5) break
         }
-      } catch (e) {
-        console.error("Failed to parse roadmap", e)
       }
     }
-  }, [])
+  } catch {}
 
   return (
     <motion.div
@@ -99,7 +103,6 @@ export function RoadmapCard() {
       </div>
 
       <div className="relative">
-        {/* Progress line */}
         <div className="absolute left-3.5 top-2.5 bottom-2.5 w-[1px] bg-border/60" />
 
         <div className="space-y-3">
@@ -121,7 +124,7 @@ export function RoadmapCard() {
                   {isCompleted ? (
                     <CheckCircle2 className="w-3.5 h-3.5 text-success" />
                   ) : isCurrent ? (
-                    <div className="w-2 h-2 rounded-full bg-accent" />
+                    <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                   ) : (
                     <Lock className="w-2.5 h-2.5 text-foreground-subtle/50" />
                   )}
@@ -161,16 +164,25 @@ export function RoadmapCard() {
                     </div>
                   </div>
 
-                  {isCurrent && node.progress !== undefined && (
+                  {(isCurrent || isCompleted) && node.progress !== undefined && (
                     <div className="mt-2 max-w-xs">
                       <div className="flex justify-between text-mono text-[9px] mb-1">
-                        <span className="text-foreground-subtle">Concept verified</span>
+                        <span className="text-foreground-subtle">
+                          {isCompleted ? "Mastered" : "In progress"}
+                        </span>
                         <span className="text-accent font-semibold">{node.progress}%</span>
                       </div>
                       <div className="h-0.5 bg-surface-3 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-accent transition-all duration-300"
-                          style={{ width: `${node.progress}%` }}
+                        <motion.div
+                          className="h-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${node.progress}%` }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
+                          style={{
+                            background: isCompleted
+                              ? "oklch(0.60 0.16 155)"
+                              : "oklch(0.62 0.20 275)",
+                          }}
                         />
                       </div>
                     </div>

@@ -7,12 +7,11 @@ import { ContinueLearning } from "@/components/dashboard/continue-learning"
 import { RoadmapCard } from "@/components/dashboard/roadmap-card"
 import { ProgressAnalytics } from "@/components/dashboard/progress-analytics"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
-import { StreakCard } from "@/components/dashboard/streak-card"
 import { DailyMissions } from "@/components/dashboard/daily-missions"
+import { PlannerCard } from "@/components/dashboard/planner-card"
 import { QuizCard } from "@/components/dashboard/quiz-card"
 import { NotesCard } from "@/components/dashboard/notes-card"
 import { AIMentorCard } from "@/components/dashboard/ai-mentor-card"
-import { PlannerCard } from "@/components/dashboard/planner-card"
 import { Loader2 } from "lucide-react"
 import { PageWrapper } from "@/components/dashboard/page-wrapper"
 
@@ -36,7 +35,7 @@ export default function DashboardPage() {
   return (
     <PageWrapper maxWidth="xl">
       <WelcomeHeader />
-      
+
       {/* Main Command Deck Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Column — Main Content Deck (2/3 width) */}
@@ -46,18 +45,18 @@ export default function DashboardPage() {
           <ProgressAnalytics />
           <RecentActivity />
         </div>
-        
-        {/* Right Column — Status & Support Deck (1/3 width) */}
+
+        {/* Right Column — Status & Support Deck (1/3 width)
+            StreakCard removed — streak + XP now live in WelcomeHeader.
+            PlannerCard promoted to the top slot. */}
         <div className="space-y-6">
-          <StreakCard />
+          <PlannerCard />
           <DailyMissions />
           <QuizCard />
           <NotesCard />
           <AIMentorCard />
-          <PlannerCard />
         </div>
       </div>
     </PageWrapper>
   )
 }
-
