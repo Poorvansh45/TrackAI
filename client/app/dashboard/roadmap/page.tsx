@@ -151,97 +151,121 @@ export default function RoadmapPage() {
         <div className="orb-glow absolute w-[300px] h-[300px] bg-success/4 bottom-0 left-1/3" style={{ animationDelay: "2s" }} />
       </div>
 
-      <PageWrapper maxWidth="full" className="relative z-10 !space-y-6">
-        {/* Page header */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center justify-between mb-6 pb-5 border-b border-border/40"
-        >
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-mono text-[9px] text-accent uppercase tracking-widest font-semibold">
-                Mission Control
-              </span>
-            </div>
-            <h1 className="text-display text-2xl sm:text-3xl text-foreground">
-              Learning <span className="text-accent">Roadmap</span>
-            </h1>
-            <p className="text-mono text-[10px] text-foreground-subtle mt-1">
-              {roadmap.skill.toUpperCase()} · {roadmap.totalNodes} TOPICS · {roadmap.phases.length} PHASES
-            </p>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 glass-panel px-3 py-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            <span className="text-mono text-[9px] text-success uppercase">AI Online</span>
-          </div>
-        </motion.div>
+      <div className="relative z-10">
+        {/* Hero Section Container (Full bleed) */}
+        <div className="relative border-b border-border/30 bg-gradient-to-b from-accent/[0.04] via-accent/[0.01] to-transparent mb-16">
+          <div className="max-w-[1400px] mx-auto px-10 lg:px-14 pt-12 md:pt-16 pb-12">
+            {/* Page header inside Hero */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="flex flex-col md:flex-row md:items-center justify-between gap-6"
+            >
+              <div className="relative">
+                {/* Soft background glow orb behind header */}
+                <div className="absolute top-1/2 left-0 -translate-y-1/2 w-72 h-24 bg-accent/10 blur-[80px] rounded-full pointer-events-none" />
 
-        {/* Mobile toggles */}
-        <div className="flex gap-2 mb-4 lg:hidden">
-          <button
-            onClick={() => setShowLeftPanel((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel text-mono text-[10px] text-foreground-muted"
-          >
-            Track Info <ChevronDown className={`w-3 h-3 transition-transform ${showLeftPanel ? "rotate-180" : ""}`} />
-          </button>
-          <button
-            onClick={() => setShowRightPanel((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel text-mono text-[10px] text-foreground-muted"
-          >
-            AI Mentor <ChevronDown className={`w-3 h-3 transition-transform ${showRightPanel ? "rotate-180" : ""}`} />
-          </button>
-        </div>
+                {/* MISSION CONTROL badge */}
+                <div className="mb-5 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/20">
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  <span className="text-mono text-[9px] text-accent uppercase tracking-widest font-bold">
+                    Mission Control
+                  </span>
+                </div>
 
-        {/* 3-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_260px] xl:grid-cols-[280px_1fr_280px] gap-5">
-          {/* LEFT */}
-          <div className={`${showLeftPanel ? "block" : "hidden"} lg:block`}>
-            <TrackInfoPanel
-              skill={roadmap.skill}
-              totalPhases={roadmap.phases.length}
-              completedNodes={roadmap.completedNodes}
-              totalNodes={roadmap.totalNodes}
-              currentPhaseLabel={roadmap.currentPhaseLabel}
-              currentPhaseNumber={roadmap.currentPhaseNumber}
-            />
-          </div>
+                {/* Title */}
+                <h1 className="text-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-4 relative z-10">
+                  Learning <span className="text-accent relative" style={{ textShadow: "0 0 30px oklch(0.62 0.20 275 / 0.35)" }}>Roadmap</span>
+                </h1>
 
-          {/* CENTER — Learning Graph */}
-          <div className="min-w-0">
-            <div className="glass-panel px-4 py-3 mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-accent" />
-                <span className="text-[12px] font-semibold text-foreground">Learning Graph</span>
+                {/* Metadata row */}
+                <div className="flex flex-wrap items-center gap-3 text-mono text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">
+                  <span>{roadmap.skill}</span>
+                  <span className="text-border/80">•</span>
+                  <span>{roadmap.totalNodes} Topics</span>
+                  <span className="text-border/80">•</span>
+                  <span>{roadmap.phases.length} Phases</span>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-mono text-[9px] text-foreground-subtle">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-success inline-block" />Completed
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse inline-block" />Active
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-foreground-subtle/30 inline-block" />Locked
+
+              {/* AI Online badge balanced on the right */}
+              <div className="flex items-center gap-2 bg-success/5 border border-success/15 hover:border-success/30 px-3.5 py-1.5 rounded-full w-fit self-start md:self-center transition-all duration-300 backdrop-blur-md shadow-[0_0_15px_rgba(96,244,155,0.05)]">
+                <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                <span className="text-mono text-[9px] text-success uppercase tracking-widest font-bold">
+                  AI Online
                 </span>
               </div>
-            </div>
-
-            <LearningGraph
-              phases={roadmap.phases}
-              skill={roadmap.skill}
-              justUnlockedSlugs={justUnlocked}
-            />
-          </div>
-
-          {/* RIGHT */}
-          <div className={`${showRightPanel ? "block" : "hidden"} lg:block`}>
-            <AIAssistantPanel phases={roadmap.phases} skill={roadmap.skill} />
+            </motion.div>
           </div>
         </div>
-      </PageWrapper>
+
+        {/* Main Content Area Container (1400px centered, aligns with Hero content, 64px bottom spacing after hero) */}
+        <div className="max-w-[1400px] mx-auto px-10 lg:px-14 pb-16 z-10 relative">
+          {/* Mobile toggles */}
+          <div className="flex gap-2 mb-4 lg:hidden">
+            <button
+              onClick={() => setShowLeftPanel((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel text-mono text-[10px] text-foreground-muted"
+            >
+              Track Info <ChevronDown className={`w-3 h-3 transition-transform ${showLeftPanel ? "rotate-180" : ""}`} />
+            </button>
+            <button
+              onClick={() => setShowRightPanel((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel text-mono text-[10px] text-foreground-muted"
+            >
+              AI Mentor <ChevronDown className={`w-3 h-3 transition-transform ${showRightPanel ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+
+          {/* 3-column layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_260px] xl:grid-cols-[280px_1fr_280px] gap-5">
+            {/* LEFT */}
+            <div className={`${showLeftPanel ? "block" : "hidden"} lg:block`}>
+              <TrackInfoPanel
+                skill={roadmap.skill}
+                totalPhases={roadmap.phases.length}
+                completedNodes={roadmap.completedNodes}
+                totalNodes={roadmap.totalNodes}
+                currentPhaseLabel={roadmap.currentPhaseLabel}
+                currentPhaseNumber={roadmap.currentPhaseNumber}
+              />
+            </div>
+
+            {/* CENTER — Learning Graph */}
+            <div className="min-w-0">
+              <div className="glass-panel px-4 py-3 mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-accent" />
+                  <span className="text-[12px] font-semibold text-foreground">Learning Graph</span>
+                </div>
+                <div className="flex items-center gap-3 text-mono text-[9px] text-foreground-subtle">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-success inline-block" />Completed
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-accent animate-pulse inline-block" />Active
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-foreground-subtle/30 inline-block" />Locked
+                  </span>
+                </div>
+              </div>
+
+              <LearningGraph
+                phases={roadmap.phases}
+                skill={roadmap.skill}
+                justUnlockedSlugs={justUnlocked}
+              />
+            </div>
+
+            {/* RIGHT */}
+            <div className={`${showRightPanel ? "block" : "hidden"} lg:block`}>
+              <AIAssistantPanel phases={roadmap.phases} skill={roadmap.skill} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
