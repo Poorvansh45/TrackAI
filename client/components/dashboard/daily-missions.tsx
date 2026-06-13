@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import { Zap, CheckCircle2, Clock, Target } from "lucide-react"
-import { useActiveTopic } from "@/hooks/use-active-topic"
+import { useRoadmapProgress } from "@/lib/roadmap-state"
 import { useRouter } from "next/navigation"
 
 interface Mission {
@@ -11,84 +11,47 @@ interface Mission {
   time: string
   xp: number
   status: "done" | "active" | "pending"
-  slug?: string
-}
-
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-}
-
-function isTopicDone(topicName: string, phase: any): boolean {
-  if (phase._nodeStatus?.[topicName] === "completed") return true
-  try {
-    const slug = toSlug(topicName)
-    const raw = localStorage.getItem(`topic_progress_${slug}`)
-    if (raw) return JSON.parse(raw).length >= 5
-  } catch {}
-  return false
+  slug: string
 }
 
 export function DailyMissions() {
   const router = useRouter()
-  const { activeTopic } = useActiveTopic()
+  const { data, loading } = useRoadmapProgress()
 
-  // Build missions from roadmap around the current active topic
+  // Build missions directly from backend roadmap_progress — status
+  // (done/active/pending) is read straight from MongoDB, identical to
+  // what the Dashboard's Continue Learning card and Learning Graph show.
   const missions: Mission[] = []
+  let activeSlug = ""
 
-  try {
-    const raw = localStorage.getItem("generatedRoadmap")
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      const phases: any[] = parsed?.roadmap_result?.phases || []
+  if (data) {
+    const flat = data.phases
+      .flatMap((p) => p.topics)
+      .sort((a, b) => a.order - b.order)
 
-      // Flatten all topics
-      const allTopics: Array<{ name: string; phase: any }> = []
-      for (const phase of phases) {
-        for (const topic of phase.topics || []) {
-          allTopics.push({ name: topic, phase })
-        }
-      }
+    const activeIdx = flat.findIndex((t) => t.status === "active")
+    activeSlug = flat[activeIdx]?.topic_id || ""
 
-      // Find active index
-      const activeIdx = activeTopic
-        ? allTopics.findIndex(({ name }) => toSlug(name) === activeTopic.slug)
-        : 0
+    // Show: 1 completed before active (if exists) + active + 2 upcoming
+    const start = Math.max(0, activeIdx - 1)
+    const windowTopics = flat.slice(start, start + 4)
 
-      // Show: 1 completed before active (if exists) + active + 2 upcoming
-      const start = Math.max(0, activeIdx - 1)
-      const window = allTopics.slice(start, start + 4)
-
-      window.forEach(({ name, phase }, i) => {
-        const slug = toSlug(name)
-        const done = isTopicDone(name, phase)
-        const isActive = slug === activeTopic?.slug
-
-        let status: "done" | "active" | "pending" = "pending"
-        if (done) status = "done"
-        else if (isActive) status = "active"
-
-        missions.push({
-          id: i + 1,
-          name: `Study: ${name}`,
-          time: "~1.5h",
-          xp: 100,
-          status,
-          slug,
-        })
+    windowTopics.forEach((topic, i) => {
+      missions.push({
+        id: i + 1,
+        name: `Study: ${topic.topic_name}`,
+        time: "~1.5h",
+        xp: 100,
+        status: topic.status === "completed" ? "done" : topic.status === "active" ? "active" : "pending",
+        slug: topic.topic_id,
       })
-    }
-  } catch {}
+    })
+  }
 
-  // If no roadmap data yet, show loading placeholder
-  const displayMissions =
+  const displayMissions: Mission[] =
     missions.length > 0
       ? missions
-      : [{ id: 1, name: "Loading missions...", time: "--", xp: 0, status: "pending" as const }]
+      : [{ id: 1, name: "Loading missions...", time: "--", xp: 0, status: "pending", slug: "" }]
 
   const completedCount = displayMissions.filter((m) => m.status === "done").length
 
@@ -162,13 +125,13 @@ export function DailyMissions() {
       </div>
 
       {/* Active topic CTA */}
-      {activeTopic && (
+      {!loading && activeSlug && (
         <button
-          onClick={() => router.push(`/topic/${activeTopic.slug}`)}
+          onClick={() => router.push(`/topic/${activeSlug}`)}
           className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-md border border-accent/25 bg-accent/8 hover:bg-accent/15 text-mono text-[10px] text-accent font-semibold transition-all"
         >
           <Target className="w-3.5 h-3.5" />
-          Open: {activeTopic.title}
+          Open: {displayMissions.find((m) => m.slug === activeSlug)?.name.replace("Study: ", "")}
         </button>
       )}
     </motion.div>

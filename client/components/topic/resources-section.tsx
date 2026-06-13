@@ -70,6 +70,25 @@ export function ResourcesSection({ resources }: ResourcesSectionProps) {
     return urlOk
   })
 
+  // Filter out any reading resources with invalid URLs or untrusted domains
+  const validReading = resources.reading.filter((item) => {
+    const trustedDomains = [
+      "w3schools.com", "geeksforgeeks.org", "docs.python.org",
+      "realpython.com", "developer.mozilla.org", "javascript.info",
+      "git-scm.com", "man7.org", "linuxcommand.org", "docs.oracle.com",
+      "docs.rust-lang.org", "docs.microsoft.com", "learn.microsoft.com",
+      "kotlinlang.org", "docs.swift.org", "nodejs.org", "reactjs.org",
+      "react.dev", "vuejs.org", "angular.io", "typescriptlang.org",
+      "aws.amazon.com",
+    ]
+    try {
+      const u = new URL(item.url)
+      return trustedDomains.some((d) => u.hostname.includes(d))
+    } catch {
+      return false
+    }
+  })
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -103,7 +122,7 @@ export function ResourcesSection({ resources }: ResourcesSectionProps) {
         {validVideos.length === 0 ? (
           <div className="flex items-center gap-2 text-foreground-subtle text-[12px] py-4">
             <AlertCircle className="w-4 h-4" />
-            <span>Video resources are loading. Please refresh in a moment.</span>
+            <span>Unable to load video resources.</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -202,29 +221,14 @@ export function ResourcesSection({ resources }: ResourcesSectionProps) {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {resources.reading.map((item, i) => {
-            // Validate reading URL — must be one of the trusted domains
-            const trustedDomains = [
-              "w3schools.com", "geeksforgeeks.org", "docs.python.org",
-              "realpython.com", "developer.mozilla.org", "javascript.info",
-              "git-scm.com", "man7.org", "linuxcommand.org", "docs.oracle.com",
-              "docs.rust-lang.org", "docs.microsoft.com", "learn.microsoft.com",
-              "kotlinlang.org", "docs.swift.org", "nodejs.org", "reactjs.org",
-              "react.dev", "vuejs.org", "angular.io", "typescriptlang.org",
-            ]
-            const isValidUrl = (() => {
-              try {
-                const u = new URL(item.url)
-                return trustedDomains.some((d) => u.hostname.includes(d))
-              } catch {
-                return false
-              }
-            })()
-
-            if (!isValidUrl) return null
-
-            return (
+        {validReading.length === 0 ? (
+          <div className="flex items-center gap-2 text-foreground-subtle text-[12px] py-4">
+            <AlertCircle className="w-4 h-4" />
+            <span>Unable to load reading resources.</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {validReading.map((item, i) => (
               <motion.a
                 key={i}
                 href={item.url}
@@ -251,9 +255,9 @@ export function ResourcesSection({ resources }: ResourcesSectionProps) {
                 </div>
                 <ExternalLink className="w-3.5 h-3.5 text-foreground-subtle group-hover:text-accent flex-shrink-0 transition-colors" />
               </motion.a>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </motion.div>
   )

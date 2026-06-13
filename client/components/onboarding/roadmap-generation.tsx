@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { motion } from "framer-motion"
 import { User, Route, FileQuestion, RefreshCw, CheckCircle2, Loader2, AlertCircle } from "lucide-react"
 import type { OnboardingData } from "@/app/onboarding/page"
+import { initRoadmap } from "@/lib/roadmap-state"
 
 const generationSteps = [
   { id: 1, label: "Analyzing your profile",    icon: User },
@@ -111,6 +112,14 @@ export function RoadmapGeneration({ data, onNext }: RoadmapGenerationProps) {
           localStorage.setItem("generatedRoadmap", JSON.stringify(result))
         } catch (e) {
           console.warn("localStorage unavailable — result will not persist across page loads", e)
+        }
+
+        // Initialize backend roadmap_progress (single source of truth for
+        // topic unlock state). Idempotent — safe even if onboarding is rerun.
+        try {
+          await initRoadmap()
+        } catch (e) {
+          console.warn("[RoadmapGeneration] initRoadmap failed", e)
         }
 
         // Mark all steps done, then advance the onboarding stepper

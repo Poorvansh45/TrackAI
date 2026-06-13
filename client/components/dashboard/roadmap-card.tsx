@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { CheckCircle2, Lock, ChevronRight, Play } from "lucide-react"
 import Link from "next/link"
-import { useActiveTopic } from "@/hooks/use-active-topic"
+import { useRoadmapProgress } from "@/lib/roadmap-state"
 
 interface Node {
   id: string
@@ -15,72 +15,38 @@ interface Node {
   progress?: number
 }
 
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-}
-
-function isCompleted(topicName: string, phase: any): boolean {
-  if (phase._nodeStatus?.[topicName] === "completed") return true
-  try {
-    const slug = toSlug(topicName)
-    const raw = localStorage.getItem(`topic_progress_${slug}`)
-    if (raw) return JSON.parse(raw).length >= 5
-  } catch {}
-  return false
-}
-
 export function RoadmapCard() {
   const router = useRouter()
-  const { activeTopic } = useActiveTopic()
+  const { data, loading } = useRoadmapProgress()
 
-  // Build node list from localStorage roadmap, using activeTopic as the live marker
-  let nodes: Node[] = []
-  let skillLabel = "Loading Track..."
+  const skillLabel = data?.skill ? `${data.skill} Track` : "Loading Track..."
 
-  try {
-    const raw = localStorage.getItem("generatedRoadmap")
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed?.skill) skillLabel = `${parsed.skill} Track`
+  // Build a flat, ordered node list directly from backend roadmap_progress —
+  // this is the SAME data the Learning Graph and Dashboard both read, so
+  // status (completed/current/locked) and progress are always identical.
+  const nodes: Node[] = []
+  if (data) {
+    const flat = data.phases
+      .flatMap((p) => p.topics)
+      .sort((a, b) => a.order - b.order)
 
-      if (parsed?.roadmap_result?.phases) {
-        const phases = parsed.roadmap_result.phases
-        let count = 1
-
-        for (const phase of phases) {
-          for (const topic of phase.topics || []) {
-            const slug = toSlug(topic)
-            const completed = isCompleted(topic, phase)
-            const isCurrent = slug === activeTopic?.slug
-
-            let progress = 0
-            if (isCurrent && activeTopic) {
-              progress = activeTopic.progress
-            } else if (completed) {
-              progress = 100
-            }
-
-            nodes.push({
-              id: `RD-${String(count).padStart(3, "0")}`,
-              name: topic,
-              slug,
-              status: completed ? "completed" : isCurrent ? "current" : "locked",
-              xp: 100 * count,
-              progress: isCurrent ? progress : completed ? 100 : undefined,
-            })
-            count++
-            if (nodes.length >= 5) break
-          }
-          if (nodes.length >= 5) break
-        }
-      }
+    for (const topic of flat.slice(0, 5)) {
+      nodes.push({
+        id: `RD-${String(topic.order + 1).padStart(3, "0")}`,
+        name: topic.topic_name,
+        slug: topic.topic_id,
+        status:
+          topic.status === "completed" ? "completed" :
+          topic.status === "active"    ? "current"   :
+          "locked",
+        xp: topic.status === "completed" ? topic.xp_earned : 100 * (topic.order + 1),
+        progress:
+          topic.status === "completed" ? 100 :
+          topic.status === "active"    ? topic.progress_pct :
+          undefined,
+      })
     }
-  } catch {}
+  }
 
   return (
     <motion.div
@@ -191,6 +157,12 @@ export function RoadmapCard() {
               </div>
             )
           })}
+
+          {!loading && nodes.length === 0 && (
+            <p className="text-[12px] text-foreground-subtle py-4 text-center">
+              No roadmap data yet — complete onboarding to generate your track.
+            </p>
+          )}
         </div>
       </div>
     </motion.div>

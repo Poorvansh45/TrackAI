@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { Cpu, ChevronDown } from "lucide-react"
 import { TrackInfoPanel } from "@/components/roadmap/track-info-panel"
@@ -8,8 +8,10 @@ import { LearningGraph, type PhaseData } from "@/components/roadmap/learning-gra
 import { AIAssistantPanel } from "@/components/roadmap/ai-assistant-panel"
 import type { RoadmapNodeData, NodeStatus } from "@/components/roadmap/roadmap-node"
 import { PageWrapper } from "@/components/dashboard/page-wrapper"
+import { useRoadmapProgress, type BackendRoadmapState } from "@/lib/roadmap-state"
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Difficulty/XP/duration heuristics (display-only — status & progress
+//     come straight from the backend, the single source of truth) ─────────
 
 function getDifficulty(pIdx: number, nIdx: number): "Beginner" | "Intermediate" | "Advanced" {
   const combined = pIdx * 10 + nIdx
@@ -26,150 +28,89 @@ function getDuration(d: "Beginner" | "Intermediate" | "Advanced") {
   return d === "Beginner" ? "~1.5h" : d === "Intermediate" ? "~3h" : "~5h"
 }
 
-function toSlug(name: string) {
-  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "")
-}
+// ─── Backend state -> view model ───────────────────────────────────────────
 
-// ─── Roadmap parser (reads _nodeStatus overrides) ──────────────────────────
-
-interface ParsedRoadmap {
+interface ViewModel {
   skill: string
   phases: PhaseData[]
   completedNodes: number
   totalNodes: number
   currentPhaseLabel: string
   currentPhaseNumber: number
-  /** Set of topic slugs that were JUST unlocked (for glow animation) */
-  justUnlockedSlugs: Set<string>
 }
 
-function parseRoadmapData(prevJustUnlocked?: Set<string>): ParsedRoadmap | null {
-  try {
-    const saved = localStorage.getItem("generatedRoadmap")
-    if (!saved) return null
-    const data = JSON.parse(saved)
-    if (!data?.roadmap_result?.phases) return null
-
-    const rawPhases = data.roadmap_result.phases
-    let firstActiveSet = false
-    const justUnlockedSlugs = new Set<string>()
-
-    const phases: PhaseData[] = rawPhases.map((p: any, pIdx: number) => {
-      const nodeStatusOverrides: Record<string, string> = p._nodeStatus || {}
-
-      const nodes: RoadmapNodeData[] = (p.topics || []).map((topic: string, nIdx: number) => {
-        const difficulty = getDifficulty(pIdx, nIdx)
-        const slug = toSlug(topic)
-
-        // Determine status: override → first-active fallback → locked
-        let status: NodeStatus = "locked"
-        if (nodeStatusOverrides[topic]) {
-          status = nodeStatusOverrides[topic] as NodeStatus
-        } else if (!firstActiveSet) {
-          status = "active"
-        }
-
-        if (status === "active" || status === "completed") {
-          firstActiveSet = true
-        }
-
-        // Check if this node was newly unlocked (compare to previous state)
-        if (status === "active" && prevJustUnlocked === undefined) {
-          // first render — don't glow anything
-        } else if (status === "active" && prevJustUnlocked && !prevJustUnlocked.has(slug)) {
-          // Was previously not active → newly unlocked
-          justUnlockedSlugs.add(slug)
-        }
-
-        // Derive progress from saved localStorage progress
-        let progress = 0
-        if (status === "completed") {
-          progress = 100
-        } else if (status === "active") {
-          try {
-            const saved = localStorage.getItem(`topic_progress_${slug}`)
-            if (saved) {
-              const arr: string[] = JSON.parse(saved)
-              // We don't know total from roadmap; assume 5 subtopics
-              progress = Math.min(100, Math.round((arr.length / 5) * 100))
-            }
-          } catch {}
-        }
-
-        return {
-          id:         `P${pIdx + 1}N${nIdx + 1}`,
-          name:       topic,
-          status,
-          progress,
-          xp:         getXP(difficulty),
-          difficulty,
-          duration:   getDuration(difficulty),
-          phaseIndex: pIdx,
-          nodeIndex:  nIdx,
-        }
-      })
-
+function buildViewModel(state: BackendRoadmapState): ViewModel {
+  const phases: PhaseData[] = state.phases.map((phase, pIdx) => ({
+    phaseNumber: phase.phase_number,
+    phaseTitle: phase.phase_title,
+    nodes: phase.topics.map((topic, nIdx): RoadmapNodeData => {
+      const difficulty = getDifficulty(pIdx, nIdx)
       return {
-        phaseNumber: p.phase_number || pIdx + 1,
-        phaseTitle:  p.phase_title  || `Phase ${pIdx + 1}`,
-        nodes,
+        id: topic.topic_id,
+        name: topic.topic_name,
+        status: topic.status as NodeStatus,
+        // progress_pct is computed server-side, capped 0-100 — root-cause fix
+        progress: topic.status === "completed" ? 100 : topic.progress_pct,
+        xp: topic.status === "completed" ? topic.xp_earned : getXP(difficulty),
+        difficulty,
+        duration: getDuration(difficulty),
+        phaseIndex: pIdx,
+        nodeIndex: nIdx,
       }
-    })
+    }),
+  }))
 
-    const allNodes       = phases.flatMap(p => p.nodes)
-    const completedNodes = allNodes.filter(n => n.status === "completed").length
-    const activePhase    = phases.find(p => p.nodes.some(n => n.status === "active"))
+  const allNodes = phases.flatMap((p) => p.nodes)
+  const activePhase = phases.find((p) => p.nodes.some((n) => n.status === "active"))
 
-    return {
-      skill:              data.skill || "Custom Track",
-      phases,
-      completedNodes,
-      totalNodes:         allNodes.length,
-      currentPhaseLabel:  activePhase?.phaseTitle  || phases[0]?.phaseTitle || "Phase 1",
-      currentPhaseNumber: activePhase?.phaseNumber || 1,
-      justUnlockedSlugs,
-    }
-  } catch {
-    return null
+  return {
+    skill: state.skill,
+    phases,
+    completedNodes: state.completed_count,
+    totalNodes: state.total_count,
+    currentPhaseLabel: activePhase?.phaseTitle || phases[0]?.phaseTitle || "Phase 1",
+    currentPhaseNumber: activePhase?.phaseNumber || 1,
   }
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function RoadmapPage() {
-  const [roadmap, setRoadmap] = useState<ParsedRoadmap | null>(null)
+  const { data, loading } = useRoadmapProgress()
   const [mounted, setMounted] = useState(false)
-  const [showLeftPanel,  setShowLeftPanel]  = useState(false)
+  const [showLeftPanel, setShowLeftPanel] = useState(false)
   const [showRightPanel, setShowRightPanel] = useState(false)
 
-  const loadRoadmap = useCallback((prevUnlocked?: Set<string>) => {
-    const parsed = parseRoadmapData(prevUnlocked)
-    setRoadmap(parsed)
-  }, [])
+  // Track previously-active topic_ids so newly-unlocked nodes can glow once
+  const prevActiveIds = useRef<Set<string>>(new Set())
+  const [justUnlockedSlugs, setJustUnlockedSlugs] = useState<Set<string>>(new Set())
+
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
-    loadRoadmap()
-    setMounted(true)
+    if (!data) return
+    const currentActive = new Set(
+      data.phases.flatMap((p) => p.topics).filter((t) => t.status === "active").map((t) => t.topic_id)
+    )
 
-    // Listen for storage events (fired from topic page after completion)
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "generatedRoadmap") {
-        setRoadmap(prev => {
-          const prevSlugs = prev
-            ? new Set(prev.phases.flatMap(p => p.nodes.filter(n => n.status === "active").map(n => toSlug(n.name))))
-            : undefined
-          return parseRoadmapData(prevSlugs)
-        })
-      }
+    if (prevActiveIds.current.size > 0) {
+      const newlyUnlocked = new Set<string>()
+      currentActive.forEach((id) => {
+        if (!prevActiveIds.current.has(id)) newlyUnlocked.add(id)
+      })
+      if (newlyUnlocked.size > 0) setJustUnlockedSlugs(newlyUnlocked)
     }
 
-    window.addEventListener("storage", handleStorage)
-    return () => window.removeEventListener("storage", handleStorage)
-  }, [loadRoadmap])
+    prevActiveIds.current = currentActive
+  }, [data])
 
+  // Only block render on the very first load (no data yet).
+  // On subsequent refreshes (roadmap-update event), keep showing stale data
+  // while the new fetch is in-flight — prevents a flash of blank content.
   if (!mounted) return null
+  if (loading && !data) return null
 
-  if (!roadmap) {
+  if (!data || data.total_count === 0) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
         <div className="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center mb-5">
@@ -189,13 +130,25 @@ export default function RoadmapPage() {
     )
   }
 
+  const roadmap = buildViewModel(data)
+
+  // roadmap-node.tsx navigates using toSlug(node.name); topic_id (our id)
+  // is generated the same way server-side, so they're identical strings —
+  // map node.id -> the slug the node component will compute for itself.
+  const justUnlocked = new Set(
+    roadmap.phases
+      .flatMap((p) => p.nodes)
+      .filter((n) => justUnlockedSlugs.has(n.id))
+      .map((n) => n.id)
+  )
+
   return (
     <div className="relative min-h-screen">
       {/* Ambient glow orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="orb-glow absolute w-[500px] h-[500px] bg-accent/8 -top-32 -left-24" style={{ animationDelay: "0s" }} />
-        <div className="orb-glow absolute w-[400px] h-[400px] bg-accent/5 top-1/2 -right-32"  style={{ animationDelay: "3.5s" }} />
-        <div className="orb-glow absolute w-[300px] h-[300px] bg-success/4 bottom-0 left-1/3"  style={{ animationDelay: "2s" }} />
+        <div className="orb-glow absolute w-[400px] h-[400px] bg-accent/5 top-1/2 -right-32" style={{ animationDelay: "3.5s" }} />
+        <div className="orb-glow absolute w-[300px] h-[300px] bg-success/4 bottom-0 left-1/3" style={{ animationDelay: "2s" }} />
       </div>
 
       <PageWrapper maxWidth="full" className="relative z-10 !space-y-6">
@@ -229,13 +182,13 @@ export default function RoadmapPage() {
         {/* Mobile toggles */}
         <div className="flex gap-2 mb-4 lg:hidden">
           <button
-            onClick={() => setShowLeftPanel(v => !v)}
+            onClick={() => setShowLeftPanel((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel text-mono text-[10px] text-foreground-muted"
           >
             Track Info <ChevronDown className={`w-3 h-3 transition-transform ${showLeftPanel ? "rotate-180" : ""}`} />
           </button>
           <button
-            onClick={() => setShowRightPanel(v => !v)}
+            onClick={() => setShowRightPanel((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-panel text-mono text-[10px] text-foreground-muted"
           >
             AI Mentor <ChevronDown className={`w-3 h-3 transition-transform ${showRightPanel ? "rotate-180" : ""}`} />
@@ -244,7 +197,6 @@ export default function RoadmapPage() {
 
         {/* 3-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_260px] xl:grid-cols-[280px_1fr_280px] gap-5">
-
           {/* LEFT */}
           <div className={`${showLeftPanel ? "block" : "hidden"} lg:block`}>
             <TrackInfoPanel
@@ -280,7 +232,7 @@ export default function RoadmapPage() {
             <LearningGraph
               phases={roadmap.phases}
               skill={roadmap.skill}
-              justUnlockedSlugs={roadmap.justUnlockedSlugs}
+              justUnlockedSlugs={justUnlocked}
             />
           </div>
 

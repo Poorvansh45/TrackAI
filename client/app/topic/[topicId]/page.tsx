@@ -11,6 +11,7 @@ import { VerificationQuiz } from "@/components/topic/verification-quiz"
 import { TopicNav } from "@/components/topic/topic-nav"
 import { TopicCompletionModal } from "@/components/topic/topic-completion-modal"
 import { Loader2, Cpu } from "lucide-react"
+import { updateChecklistOnServer, completeTopicOnServer, fetchRoadmapState, toSlug } from "@/lib/roadmap-state"
 
 export interface TopicData {
   title: string
@@ -68,45 +69,19 @@ function getNextTopic(currentTopicId: string): { id: string; title: string; dura
     }
 
     // Find current index
-    const currentIdx = allTopics.findIndex((t) => {
-      const slug = t.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
-      return slug === currentTopicId || t.toLowerCase() === currentTopicId.replace(/-/g, " ")
-    })
+    const currentIdx = allTopics.findIndex((t) => toSlug(t) === currentTopicId)
 
     if (currentIdx < 0 || currentIdx >= allTopics.length - 1) return null
 
     const next = allTopics[currentIdx + 1]
-    const nextSlug = next.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
 
-    return { id: nextSlug, title: next, duration: "1.5 Hours" }
+    return { id: toSlug(next), title: next, duration: "1.5 Hours" }
   } catch {
     return null
   }
 }
 
-/** Persist progress to the backend */
-async function persistProgress(
-  topicId: string,
-  completedSubtopics: string[],
-  isCompleted: boolean,
-  nextTopicId?: string
-) {
-  try {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
-    await fetch(`${apiBase}/topic/progress`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        topic_id: topicId,
-        completed_subtopics: completedSubtopics,
-        is_completed: isCompleted,
-        next_topic_id: nextTopicId || null,
-      }),
-    })
-  } catch {
-    // Silent fail — localStorage is the source of truth on the client
-  }
-}
+// (toSlug now imported from @/lib/roadmap-state)
 
 /** Fetch topic data from backend (with real resources) */
 async function fetchTopicData(topicId: string): Promise<TopicData | null> {
@@ -131,8 +106,8 @@ function buildFallbackTopicData(topicId: string, roadmapData: any): TopicData {
     const phases = roadmapData?.roadmap_result?.phases || []
     for (const phase of phases) {
       for (const topic of phase.topics || []) {
-        const slug = topic.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
-        if (slug === topicId || topic.toLowerCase() === topicId.replace(/-/g, " ")) {
+        const slug = toSlug(topic)
+        if (slug === topicId) {
           topicName = topic
           break
         }
@@ -270,16 +245,77 @@ export default function TopicPage() {
       const data = backendData ?? buildFallbackTopicData(topicId, savedRoadmap)
       setTopicData(data)
 
-      // Restore saved progress
+      // Restore saved progress — localStorage first for instant paint,
+      // then reconcile with backend roadmap_progress (single source of truth).
+      //
+      // ROOT-CAUSE FIX for "11/5 = 220%":
+      // The LLM may generate different subtopic names between runs. Both
+      // localStorage and backend completed_subtopics must be filtered against
+      // data.subtopics (the canonical list for THIS render) before being
+      // loaded into state — stale names from a prior run are silently dropped.
+      const validSubtopicSet = new Set(data.subtopics)
+
+      let localCompleted: string[] = []
       try {
         const savedProgress = localStorage.getItem(`topic_progress_${topicId}`)
         if (savedProgress) {
-          const parsed: string[] = JSON.parse(savedProgress)
-          setCompletedSubtopics(new Set(parsed))
-
-          // If already completed in a prior session, don't re-fire the modal
-          if (parsed.length === data.subtopics.length) {
+          const raw: string[] = JSON.parse(savedProgress)
+          // Filter: only keep names that exist in the current subtopic list
+          localCompleted = raw.filter((name) => validSubtopicSet.has(name))
+          if (localCompleted.length !== raw.length) {
+            // Stale names were dropped — rewrite cache with clean list
+            localStorage.setItem(`topic_progress_${topicId}`, JSON.stringify(localCompleted))
+            console.debug(
+              `[CHECKLIST_UPDATE] topic_id=${topicId} dropped ${raw.length - localCompleted.length} stale names from localStorage`
+            )
+          }
+          setCompletedSubtopics(new Set(localCompleted))
+          if (localCompleted.length >= data.subtopics.length) {
             completionFiredRef.current = true
+            console.debug(
+              `[TOPIC_COMPLETED] topic_id=${topicId} completedItems=${localCompleted.length} totalItems=${data.subtopics.length} progress=100% status=completed (restored from localStorage)`
+            )
+          }
+        }
+      } catch {}
+
+      // Reconcile with backend — if this topic is already marked completed
+      // server-side (e.g. completed on another device), reflect that here.
+      try {
+        const roadmapState = await fetchRoadmapState()
+        if (roadmapState) {
+          const backendTopic = roadmapState.phases
+            .flatMap((p) => p.topics)
+            .find((t) => t.topic_id === topicId)
+
+          if (backendTopic) {
+            console.debug(
+              `[CHECKLIST_UPDATE] topic_id=${topicId} backend status=${backendTopic.status} progress=${backendTopic.progress_pct}% completedItems=${backendTopic.completed_subtopics.length} totalItems=${data.subtopics.length}`
+            )
+
+            if (backendTopic.status === "completed") {
+              // Topic fully done server-side: mark all current subtopics complete
+              completionFiredRef.current = true
+              const all = new Set(data.subtopics)
+              setCompletedSubtopics(all)
+              localStorage.setItem(`topic_progress_${topicId}`, JSON.stringify([...all]))
+              console.debug(`[TOPIC_COMPLETED] topic_id=${topicId} progress=100% status=completed (synced from backend)`)
+            } else {
+              // Partial progress: backend completed_subtopics are display-name strings
+              // stored by the checklist — filter against current list and take the
+              // larger of local vs backend to avoid regressing progress.
+              const backendFiltered = backendTopic.completed_subtopics.filter(
+                (name) => validSubtopicSet.has(name)
+              )
+              if (backendFiltered.length > localCompleted.length) {
+                setCompletedSubtopics(new Set(backendFiltered))
+                localStorage.setItem(`topic_progress_${topicId}`, JSON.stringify(backendFiltered))
+                const pct = Math.round((backendFiltered.length / data.subtopics.length) * 100)
+                console.debug(
+                  `[CHECKLIST_UPDATE] topic_id=${topicId} completedItems=${backendFiltered.length} totalItems=${data.subtopics.length} progress=${pct}% status=${backendTopic.status} (synced from backend)`
+                )
+              }
+            }
           }
         }
       } catch {}
@@ -305,32 +341,51 @@ export default function TopicPage() {
           next.add(subtopic)
         }
 
-        const arr = [...next]
-        localStorage.setItem(`topic_progress_${topicId}`, JSON.stringify(arr))
+        // Only persist names that belong to the CURRENT subtopic list.
+        // This prevents stale names from an old LLM run accumulating in
+        // localStorage and inflating the counter beyond the real total.
+        const currentSubtopicSet = new Set(topicData?.subtopics || [])
+        const validArr = [...next].filter((name) => currentSubtopicSet.has(name))
+        localStorage.setItem(`topic_progress_${topicId}`, JSON.stringify(validArr))
 
-        // Check if newly completed
-        if (topicData && next.size === topicData.subtopics.length && !completionFiredRef.current) {
+        const totalSubtopics = topicData?.subtopics.length || 5
+        // Count only valid (current-list) items for the completion check
+        const validCompletedCount = validArr.length
+
+        console.debug(
+          `[CHECKLIST_UPDATE] topic_id=${topicId} completedItems=${validCompletedCount} totalItems=${totalSubtopics} progress=${Math.round((validCompletedCount / totalSubtopics) * 100)}% status=${validCompletedCount >= totalSubtopics ? 'completed' : 'active'}`
+        )
+
+        // Check if newly completed — guard with ref to prevent duplicate events
+        if (topicData && validCompletedCount === totalSubtopics && !completionFiredRef.current) {
           completionFiredRef.current = true
+          console.debug(`[TOPIC_COMPLETED] topic_id=${topicId} progress=100% status=completed`)
 
           // Trigger completion flow after short delay (let the last check-animation finish)
           setTimeout(() => {
             setShowCompletionModal(true)
 
-            // Persist to backend
-            persistProgress(topicId, arr, true, nextTopic?.id)
-
-            // Update roadmap node status in localStorage
-            updateRoadmapNodeStatus(topicId, nextTopic?.id)
+            // Backend: sync checklist, then mark complete + unlock next topic.
+            // This is the ONLY place topic unlocking happens — the result is
+            // read back by the Dashboard and Learning Graph via the
+            // "roadmap-update" event, so all views stay in sync.
+            updateChecklistOnServer(topicId, validArr, totalSubtopics).then(() => {
+              completeTopicOnServer(topicId).then((updatedRoadmap) => {
+                if (updatedRoadmap?.active_topic_id) {
+                  console.debug(`[TOPIC_UNLOCKED] next_topic_id=${updatedRoadmap.active_topic_id}`)
+                }
+              })
+            })
           }, 600)
         } else {
-          // Save partial progress to backend
-          persistProgress(topicId, arr, false)
+          // Save partial progress to backend — deduped & capped 0-100 server-side
+          updateChecklistOnServer(topicId, validArr, totalSubtopics)
         }
 
         return next
       })
     },
-    [topicId, topicData, nextTopic]
+    [topicId, topicData]
   )
 
   // ── Handle "Continue Learning" ─────────────────────────────────────────────
@@ -479,47 +534,4 @@ export default function TopicPage() {
       />
     </div>
   )
-}
-
-// ─── Roadmap node updater ─────────────────────────────────────────────────
-/**
- * After completing a topic, update localStorage roadmap state so the
- * roadmap graph re-renders with the correct node statuses:
- *   completed topic → status: "completed", progress: 100
- *   next topic      → status: "active"
- */
-function updateRoadmapNodeStatus(completedTopicId: string, nextTopicId?: string) {
-  try {
-    const raw = localStorage.getItem("generatedRoadmap")
-    if (!raw) return
-    const data = JSON.parse(raw)
-    const phases = data?.roadmap_result?.phases || []
-
-    let foundCompleted = false
-    let foundNext = false
-
-    for (const phase of phases) {
-      for (const topic of phase.topics || []) {
-        const slug = topic.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
-
-        if (slug === completedTopicId) {
-          // Mark completed
-          if (!phase._nodeStatus) phase._nodeStatus = {}
-          phase._nodeStatus[topic] = "completed"
-          foundCompleted = true
-        } else if (nextTopicId && slug === nextTopicId && foundCompleted && !foundNext) {
-          // Unlock next
-          if (!phase._nodeStatus) phase._nodeStatus = {}
-          phase._nodeStatus[topic] = "active"
-          foundNext = true
-        }
-      }
-    }
-
-    // Persist updated roadmap
-    localStorage.setItem("generatedRoadmap", JSON.stringify(data))
-
-    // Emit a storage event so the roadmap page can react if open in another tab
-    window.dispatchEvent(new StorageEvent("storage", { key: "generatedRoadmap" }))
-  } catch {}
 }

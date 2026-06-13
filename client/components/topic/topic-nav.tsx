@@ -27,7 +27,8 @@ export function TopicNav({
   onSectionChange,
 }: TopicNavProps) {
   const router = useRouter()
-  const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const safePct = totalCount > 0 ? Math.min(100, Math.round((completedCount / totalCount) * 100)) : 0
+  const pct = safePct
 
   return (
     <div className="fixed top-12 left-0 right-0 z-40 lg:left-14">

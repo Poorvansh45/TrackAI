@@ -16,9 +16,11 @@ export function LearningChecklist({
   onToggle,
   allMastered,
 }: LearningChecklistProps) {
-  const completed = completedSubtopics.size
   const total = subtopics.length
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+  // Cap completed count — Set may contain stale names from a prior LLM run,
+  // which would push .size above total and show e.g. "11/5 = 220%".
+  const completed = Math.min(completedSubtopics.size, total)
+  const pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0
 
   return (
     <motion.div

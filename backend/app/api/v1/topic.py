@@ -56,6 +56,7 @@ class TopicResponse(BaseModel):
 class ProgressRequest(BaseModel):
     topic_id: str
     completed_subtopics: list[str]
+    total_subtopics: int = Field(default=5, gt=0)
     is_completed: bool = False
     user_id: Optional[str] = None
     next_topic_id: Optional[str] = None
@@ -172,32 +173,67 @@ async def get_topic(topic_id: str, skill: str = "Programming"):
 
 @router.post("/progress", response_model=ProgressResponse)
 async def save_progress(payload: ProgressRequest):
-    total_subtopics = 5
-    completed_count = len(payload.completed_subtopics)
-    progress_pct = round((completed_count / total_subtopics) * 100)
-    xp_earned = 100 if payload.is_completed else 0
+    """
+    Persist checklist progress for a topic AND mirror the update into the
+    roadmap_progress collection (the single source of truth for the
+    Dashboard, Learning Graph, and Topic Workspace).
+
+    Root-cause fix for "11/5 = 220%": completed_subtopics is deduped via
+    set() and the count is capped at total_subtopics, so progress_pct can
+    never exceed 100.
+    """
+    user_id = payload.user_id or "anon"
+
+    # Dedupe + cap — never let progress exceed 100%
+    unique_completed = list(dict.fromkeys(payload.completed_subtopics))
+    completed_count = min(len(unique_completed), payload.total_subtopics)
+    progress_pct = max(0, min(100, round((completed_count / payload.total_subtopics) * 100)))
 
     await _persist_progress(
         topic_id=payload.topic_id,
-        user_id=payload.user_id or "anon",
-        completed_subtopics=payload.completed_subtopics,
+        user_id=user_id,
+        completed_subtopics=unique_completed[:payload.total_subtopics],
         is_completed=payload.is_completed,
         progress_pct=progress_pct,
-        xp_earned=xp_earned,
+        xp_earned=100 if payload.is_completed else 0,
     )
 
+    # ── Mirror into roadmap_progress (single source of truth) ──────────────
     next_unlocked = None
-    if payload.is_completed and payload.next_topic_id:
-        await _unlock_topic(payload.next_topic_id, payload.user_id or "anon")
-        next_unlocked = payload.next_topic_id
+    try:
+        from app.api.v1.roadmap_progress import (
+            update_checklist, complete_topic,
+            ChecklistRequest, CompleteRequest,
+        )
+
+        # Always sync checklist state first
+        await update_checklist(
+            payload.topic_id,
+            ChecklistRequest(
+                user_id=user_id,
+                completed_subtopics=unique_completed,
+                total_subtopics=payload.total_subtopics,
+            ),
+        )
+
+        # If fully completed, mark complete + unlock next topic
+        if payload.is_completed:
+            result = await complete_topic(payload.topic_id, CompleteRequest(user_id=user_id))
+            next_unlocked = result.next_topic_id
+
+    except HTTPException as exc:
+        # Roadmap not initialized yet for this user — non-fatal, log and continue.
+        logger.info("[Progress] roadmap_progress sync skipped for user_id=%s: %s", user_id, exc.detail)
+    except Exception as exc:
+        logger.warning("[Progress] roadmap_progress sync failed: %s", exc)
 
     return ProgressResponse(
         success=True,
         topic_id=payload.topic_id,
         completed_count=completed_count,
         is_completed=payload.is_completed,
-        xp_earned=xp_earned,
-        next_topic_unlocked=next_unlocked,
+        xp_earned=100 if payload.is_completed else 0,
+        next_topic_unlocked=next_unlocked or payload.next_topic_id if payload.is_completed else None,
     )
 
 
@@ -269,22 +305,6 @@ async def _persist_progress(topic_id, user_id, completed_subtopics, is_completed
         )
     except Exception as exc:
         logger.warning("[Progress] Persist failed: %s", exc)
-
-
-async def _unlock_topic(topic_id, user_id):
-    try:
-        from app.core.database import get_database
-        db = get_database()
-        if db is None:
-            return
-        await db["topic_unlocks"].update_one(
-            {"topic_id": topic_id, "user_id": user_id},
-            {"$set": {"topic_id": topic_id, "user_id": user_id,
-                      "unlocked_at": datetime.utcnow(), "status": "active"}},
-            upsert=True,
-        )
-    except Exception as exc:
-        logger.warning("[Unlock] Failed for %s: %s", topic_id, exc)
 
 
 def _empty_progress(topic_id: str) -> TopicProgressState:

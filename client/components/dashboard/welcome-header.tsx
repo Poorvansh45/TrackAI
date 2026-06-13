@@ -3,32 +3,21 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Flame, Zap } from "lucide-react"
-
-function readTotalXP(): number {
-  try {
-    let xp = 0
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith("topic_progress_")) {
-        const raw = localStorage.getItem(key)
-        if (raw) {
-          const arr: string[] = JSON.parse(raw)
-          if (arr.length >= 5) xp += 100
-        }
-      }
-    }
-    return xp
-  } catch {
-    return 0
-  }
-}
+import { useRoadmapProgress } from "@/lib/roadmap-state"
 
 export function WelcomeHeader() {
   const [userName, setUserName] = useState("Learner")
-  const [totalXP, setTotalXP] = useState(0)
+  const { data } = useRoadmapProgress()
+
+  // Total XP = sum of xp_earned across all completed topics, from the
+  // backend roadmap_progress collection (single source of truth).
+  const totalXP = data
+    ? data.phases
+        .flatMap((p) => p.topics)
+        .reduce((sum, t) => sum + (t.status === "completed" ? t.xp_earned : 0), 0)
+    : 0
 
   useEffect(() => {
-    // Read user name
     try {
       const userStr = localStorage.getItem("user")
       if (userStr) {
@@ -37,18 +26,6 @@ export function WelcomeHeader() {
         setUserName(name)
       }
     } catch {}
-
-    // Read XP
-    setTotalXP(readTotalXP())
-
-    // Sync XP when topics complete
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key?.startsWith("topic_progress_") || e.key === "generatedRoadmap") {
-        setTotalXP(readTotalXP())
-      }
-    }
-    window.addEventListener("storage", handleStorage)
-    return () => window.removeEventListener("storage", handleStorage)
   }, [])
 
   const greetingHour = new Date().getHours()
