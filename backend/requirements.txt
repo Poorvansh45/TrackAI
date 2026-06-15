@@ -22,3 +22,6 @@ langchain-community>=0.3.0
 langchain-google-genai>=2.0.0
 langchain-groq>=0.2.0
 langgraph>=0.2.0
+
+# Resource link validation (YouTube oEmbed + reading link HEAD checks)
+httpx>=0.27.0

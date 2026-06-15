@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     # Fallback : Groq Llama 3       (completely free tier)
     GOOGLE_API_KEY: str = ""
     GROQ_API_KEY: str = ""
+    YOUTUBE_API_KEY: str = ""
+    TAVILY_API_KEY: str = ""
 
     BACKEND_CORS_ORIGINS: Union[List[str], str] = []
 
