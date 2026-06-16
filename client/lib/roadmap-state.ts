@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react"
+import { triggerQuizGeneration } from "@/lib/quiz-api"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
 
@@ -166,6 +167,24 @@ export async function completeTopicOnServer(topicId: string): Promise<BackendRoa
     })
     if (!res.ok) return null
     const data = await res.json()
+
+    // ── Non-blocking quiz generation trigger ─────────────────────────────────
+    // Find the just-completed topic in the returned roadmap state so we can
+    // pass its display name and skill to the generator. Errors are swallowed
+    // intentionally — quiz generation failure must never block the user.
+    try {
+      const roadmap: BackendRoadmapState = data.roadmap as BackendRoadmapState
+      const flat = roadmap.phases.flatMap((p) => p.topics)
+      const completedTopic = flat.find((t) => t.topic_id === topicId)
+      if (completedTopic) {
+        triggerQuizGeneration(
+          topicId,
+          completedTopic.topic_name,
+          roadmap.skill
+        ).catch(() => {/* silently ignored — generation is best-effort */})
+      }
+    } catch {/* non-fatal */}
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Broadcast to all components in this tab
     window.dispatchEvent(new Event("roadmap-update"))

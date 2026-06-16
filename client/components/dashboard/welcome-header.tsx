@@ -5,7 +5,11 @@ import { motion } from "framer-motion"
 import { Flame, Zap } from "lucide-react"
 import { useRoadmapProgress } from "@/lib/roadmap-state"
 
-export function WelcomeHeader() {
+interface WelcomeHeaderProps {
+  hideStreak?: boolean
+}
+
+export function WelcomeHeader({ hideStreak = false }: WelcomeHeaderProps) {
   const [userName, setUserName] = useState("Learner")
   const { data } = useRoadmapProgress()
 
@@ -59,10 +63,12 @@ export function WelcomeHeader() {
 
       {/* Streak + XP badges — top right */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-1 border border-border">
-          <Flame className="w-3.5 h-3.5 text-warning" />
-          <span className="text-mono text-[11px] font-bold text-foreground">7D STREAK</span>
-        </div>
+        {!hideStreak && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-1 border border-border">
+            <Flame className="w-3.5 h-3.5 text-warning" />
+            <span className="text-mono text-[11px] font-bold text-foreground">7D STREAK</span>
+          </div>
+        )}
         <motion.div
           key={totalXP}
           initial={{ scale: totalXP > 0 ? 1.1 : 1 }}

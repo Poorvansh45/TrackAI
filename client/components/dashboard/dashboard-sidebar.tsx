@@ -14,19 +14,21 @@ import {
   Lock
 } from "lucide-react"
 import { useRoadmap } from "@/hooks/use-roadmap"
+import { useAvailableQuizzes } from "@/hooks/use-quiz"
 
 const sidebarItems = [
-  { name: "Dashboard",  href: "/dashboard",           icon: LayoutDashboard },
+  { name: "Dashboard",   href: "/dashboard",           icon: LayoutDashboard },
   { name: "My Roadmaps", href: "/dashboard/roadmap",   icon: Route },
-  { name: "Timeline",   href: "/dashboard/timeline",  icon: CalendarDays },
-  { name: "Quizzes",    href: "/dashboard/quiz",      icon: Target },
-  { name: "Smart Notes",href: "/dashboard/notes",     icon: FileText },
-  { name: "Analytics",  href: "/dashboard/analytics", icon: BarChart3 },
+  { name: "Timeline",    href: "/dashboard/timeline",  icon: CalendarDays },
+  { name: "Quizzes",     href: "/dashboard/quiz",      icon: Target, showBadge: true },
+  { name: "Smart Notes", href: "/dashboard/notes",     icon: FileText },
+  { name: "Analytics",   href: "/dashboard/analytics", icon: BarChart3 },
 ]
 
 export function DashboardSidebar() {
-  const pathname = usePathname()
+  const pathname   = usePathname()
   const { roadmapExists } = useRoadmap()
+  const { readyCount }    = useAvailableQuizzes()
 
   return (
     <aside className="hidden lg:flex fixed left-0 top-12 bottom-0 w-14 hover:w-48 bg-background border-r border-border flex-col transition-all duration-200 ease-in-out z-40 group/sidebar overflow-hidden">
@@ -34,15 +36,14 @@ export function DashboardSidebar() {
         {sidebarItems.map((item) => {
           const isActive = pathname === item.href
           const isLocked = !roadmapExists && item.href !== "/dashboard"
+          const hasBadge = item.showBadge && readyCount > 0 && !isLocked
           
           return (
             <Link
               key={item.name}
               href={isLocked ? "#" : item.href}
               onClick={(e) => {
-                if (isLocked) {
-                  e.preventDefault()
-                }
+                if (isLocked) e.preventDefault()
               }}
               className={`flex items-center gap-3.5 h-9 px-4 transition-all relative ${
                 isLocked
@@ -62,11 +63,21 @@ export function DashboardSidebar() {
                     <Lock className="w-[7px] h-[7px] text-foreground-subtle" />
                   </div>
                 )}
+                {/* Quiz availability badge — same style as Bell dot in dashboard-nav */}
+                {hasBadge && (
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-accent rounded-full" />
+                )}
               </div>
-              <span className="text-[12px] font-medium opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 whitespace-nowrap flex items-center">
+              <span className="text-[12px] font-medium opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 whitespace-nowrap flex items-center gap-1.5">
                 {item.name}
                 {isLocked && (
-                  <Lock className="w-[8px] h-[8px] ml-1.5 text-foreground-subtle/50" />
+                  <Lock className="w-[8px] h-[8px] text-foreground-subtle/50" />
+                )}
+                {/* Pill count badge visible when sidebar is expanded */}
+                {hasBadge && (
+                  <span className="ml-auto text-mono text-[8px] bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full font-bold leading-none">
+                    {readyCount}
+                  </span>
                 )}
               </span>
             </Link>
