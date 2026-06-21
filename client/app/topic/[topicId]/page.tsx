@@ -83,6 +83,18 @@ function getNextTopic(currentTopicId: string): { id: string; title: string; dura
 
 // (toSlug now imported from @/lib/roadmap-state)
 
+/** Read the skill name cached at onboarding — used for the FAILED → retry-generation call. */
+function getRoadmapSkill(): string {
+  try {
+    const saved = localStorage.getItem("generatedRoadmap")
+    if (!saved) return "General"
+    const data = JSON.parse(saved)
+    return data?.skill || "General"
+  } catch {
+    return "General"
+  }
+}
+
 /** Fetch topic data from backend (with real resources) */
 async function fetchTopicData(topicId: string): Promise<TopicData | null> {
   try {
@@ -513,7 +525,12 @@ export default function TopicPage() {
 
         {/* S6 — Quiz */}
         <section id="section-quiz">
-          <VerificationQuiz topicTitle={topicData.title} />
+          <VerificationQuiz
+            topicTitle={topicData.title}
+            topicId={topicId}
+            isTopicCompleted={allMastered}
+            skill={getRoadmapSkill()}
+          />
         </section>
       </div>
 
@@ -526,6 +543,7 @@ export default function TopicPage() {
       <TopicCompletionModal
         isOpen={showCompletionModal}
         topicTitle={topicData.title}
+        topicId={topicId}
         nextTopicTitle={nextTopic?.title}
         nextTopicDuration={nextTopic?.duration}
         xpEarned={100}

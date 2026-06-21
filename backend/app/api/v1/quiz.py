@@ -230,13 +230,17 @@ async def _generate_and_store(topic_id: str, topic_name: str, skill: str) -> Non
             "[QUIZ BG] Pool READY for topic_id=%s (%d questions)", topic_id, len(questions)
         )
     except Exception as exc:
-        logger.error("[QUIZ BG] Generation FAILED for topic_id=%s: %s", topic_id, exc)
+        logger.error(
+            "[QUIZ BG] Generation FAILED for topic_id=%s | exc_type=%s | exc=%s",
+            topic_id, type(exc).__name__, exc, exc_info=True,
+        )
         await pools_coll.update_one(
             {"topic_id": topic_id},
             {
                 "$set": {
                     "status":     "FAILED",
                     "error":      str(exc),
+                    "error_type": type(exc).__name__,
                     "updated_at": datetime.now(timezone.utc),
                 }
             },
@@ -325,6 +329,7 @@ async def get_quiz_status(
 async def get_available_quizzes(
     current_user: dict = Depends(get_current_user),
 ):
+    print("ENTERED /quiz/available")
     """
     Returns quizzes that are READY (or already attempted) for the authenticated
     user, derived from completed topics in their roadmap_progress.

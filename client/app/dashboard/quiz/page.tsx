@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Sparkles,
   ArrowLeft,
+  BookOpen,
 } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper } from "@/components/dashboard/page-wrapper"
@@ -27,6 +28,7 @@ import {
   startChallenge,
   submitQuiz,
   triggerQuizGeneration,
+  getQuizStatus,
   type QuizQuestion,
   type SubmitResponse,
   type AvailableQuiz,
@@ -105,27 +107,58 @@ function QuizContent() {
   const [isReviewing, setIsReviewing] = useState(false)
 
   const hasAutoStartedRef = useRef(false)
+  const [isGeneratingForTopic, setIsGeneratingForTopic] = useState(false)
+  const [generatingTopicName, setGeneratingTopicName] = useState("")
+  const generatingPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Auto-start via search param ────────────────────────────────────────────
   useEffect(() => {
     if (loading || quizzes.length === 0 || hasAutoStartedRef.current) return
 
     const topicParam = searchParams.get("topic")
-    if (topicParam) {
-      const match = quizzes.find((q) => q.topic_id === topicParam)
-      if (match) {
-        hasAutoStartedRef.current = true
-        if (match.quiz_status === "CHALLENGE_AVAILABLE") {
-          handleStartChallenge(match.topic_id)
-        } else if (
-          match.quiz_status !== "GENERATING" &&
-          match.quiz_status !== "FAILED"
-        ) {
-          handleStartQuiz(match.topic_id)
+    if (!topicParam) return
+
+    const match = quizzes.find((q) => q.topic_id === topicParam)
+    if (!match) return
+
+    hasAutoStartedRef.current = true
+
+    if (match.quiz_status === "GENERATING") {
+      setIsGeneratingForTopic(true)
+      setGeneratingTopicName(match.topic_name)
+      if (generatingPollRef.current) clearInterval(generatingPollRef.current)
+      generatingPollRef.current = setInterval(async () => {
+        const statusRes = await getQuizStatus(topicParam)
+        if (!statusRes) return
+        if (statusRes.quiz_status !== "GENERATING") {
+          if (generatingPollRef.current) {
+            clearInterval(generatingPollRef.current)
+            generatingPollRef.current = null
+          }
+          setIsGeneratingForTopic(false)
+          await refetch()
+          if (statusRes.quiz_status === "CHALLENGE_AVAILABLE") {
+            handleStartChallenge(topicParam)
+          } else {
+            handleStartQuiz(topicParam)
+          }
         }
-      }
+      }, 4000)
+    } else if (match.quiz_status === "CHALLENGE_AVAILABLE") {
+      handleStartChallenge(match.topic_id)
+    } else if (
+      match.quiz_status !== "FAILED" &&
+      match.quiz_status !== "NOT_AVAILABLE"
+    ) {
+      handleStartQuiz(match.topic_id)
     }
   }, [loading, quizzes, searchParams])
+
+  useEffect(() => {
+    return () => {
+      if (generatingPollRef.current) clearInterval(generatingPollRef.current)
+    }
+  }, [])
 
   // ── Start Handlers ─────────────────────────────────────────────────────────
 
@@ -262,6 +295,50 @@ function QuizContent() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // ── VIEW: Preparing Quiz (GENERATING auto-poll) ───────────────────────────────
+  if (isGeneratingForTopic) {
+    return (
+      <PageWrapper maxWidth="sm">
+        <div className="surface-card p-12 text-center space-y-6">
+          <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-2 border-accent/20" />
+            <motion.div
+              className="absolute inset-0 rounded-full border-2 border-transparent border-t-accent"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
+            />
+            <BookOpen className="w-7 h-7 text-accent" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-display text-xl text-foreground">
+              Preparing your quiz…
+            </h2>
+            <p className="text-[11px] text-foreground-muted leading-relaxed max-w-xs mx-auto">
+              We're generating verification questions for{" "}
+              <span className="text-foreground font-medium">
+                {generatingTopicName}
+              </span>
+              . This usually takes under a minute — you'll be dropped straight
+              into the quiz once it's ready.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (generatingPollRef.current) {
+                clearInterval(generatingPollRef.current)
+                generatingPollRef.current = null
+              }
+              setIsGeneratingForTopic(false)
+            }}
+            className="text-[12px] font-semibold text-foreground-muted hover:text-foreground transition-colors"
+          >
+            Browse other quizzes instead
+          </button>
+        </div>
+      </PageWrapper>
+    )
   }
 
   // ── VIEW: In-Progress Quiz ─────────────────────────────────────────────────

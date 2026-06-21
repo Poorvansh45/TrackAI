@@ -11,7 +11,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     payload = decode_access_token(token)
-
+    print("PAYLOAD:", payload)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -19,6 +19,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         )
 
     user_id = payload.get("sub")
+    print("USER ID:", user_id)
 
     if not user_id:
         raise HTTPException(
@@ -31,15 +32,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     # Convert string user_id back to ObjectId for MongoDB lookup
     try:
         object_id = ObjectId(user_id)
+        print("OBJECT_ID:", object_id)
     except (InvalidId, Exception):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token subject"
         )
 
-    user = await db.users.find_one({"_id": object_id})
+    user = await db.users.find_one({"_id": user_id})
+    print("USER:", user)
 
     if not user:
+        print("Looking for:", object_id)
+        sample = await db.users.find_one()
+        print("Sample user:", sample)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"

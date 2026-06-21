@@ -1,12 +1,14 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { CheckCircle2, Zap, ChevronRight, Unlock } from "lucide-react"
+import { CheckCircle2, Zap, ChevronRight, Unlock, Target } from "lucide-react"
 
 interface TopicCompletionModalProps {
   isOpen: boolean
   topicTitle: string
+  topicId?: string
   nextTopicTitle?: string
   nextTopicDuration?: string
   xpEarned?: number
@@ -17,12 +19,14 @@ interface TopicCompletionModalProps {
 export function TopicCompletionModal({
   isOpen,
   topicTitle,
+  topicId,
   nextTopicTitle,
   nextTopicDuration = "1.5 Hours",
   xpEarned = 100,
   onContinue,
   onClose,
 }: TopicCompletionModalProps) {
+  const router = useRouter()
   const audioFired = useRef(false)
 
   useEffect(() => {
@@ -223,15 +227,36 @@ export function TopicCompletionModal({
                   transition={{ delay: 0.62, duration: 0.28 }}
                   className="flex flex-col gap-2"
                 >
+                  {/* Primary: Take Verification Quiz immediately */}
+                  {topicId && (
+                    <button
+                      onClick={() => {
+                        onClose()
+                        router.push(`/dashboard/quiz?topic=${topicId}`)
+                      }}
+                      className="group w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border text-[13px] font-semibold transition-all duration-200 active:scale-[0.98]"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(0.62 0.20 275 / 0.22), oklch(0.62 0.20 275 / 0.10))",
+                        borderColor: "oklch(0.62 0.20 275 / 0.42)",
+                        color: "oklch(0.78 0.16 275)",
+                        boxShadow: "0 0 18px oklch(0.62 0.20 275 / 0.09)",
+                      }}
+                    >
+                      <Target className="w-4 h-4" />
+                      Take Verification Quiz
+                      <Zap className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* Secondary: Continue Learning (Path B) */}
                   <button
                     onClick={onContinue}
-                    className="group w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border text-[13px] font-semibold transition-all duration-200 active:scale-[0.98]"
+                    className="group w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-[13px] font-medium transition-all duration-200 active:scale-[0.98]"
                     style={{
-                      background:
-                        "linear-gradient(135deg, oklch(0.62 0.20 275 / 0.22), oklch(0.62 0.20 275 / 0.10))",
-                      borderColor: "oklch(0.62 0.20 275 / 0.42)",
-                      color: "oklch(0.78 0.16 275)",
-                      boxShadow: "0 0 18px oklch(0.62 0.20 275 / 0.09)",
+                      background: "oklch(0.62 0.20 275 / 0.05)",
+                      borderColor: "oklch(0.62 0.20 275 / 0.20)",
+                      color: "oklch(0.65 0.10 275)",
                     }}
                   >
                     Continue Learning

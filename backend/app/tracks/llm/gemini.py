@@ -29,6 +29,19 @@ import os
 
 logger = logging.getLogger("uvicorn.error")
 
+# Default output-token ceiling applied at construction time for both
+# providers, using each provider's own correctly-named field
+# (ChatGoogleGenerativeAI: max_output_tokens, ChatGroq: max_tokens). This is
+# intentionally NOT applied via .bind() on the combined fallback runnable —
+# .bind() injects whatever kwarg name you give it into every runnable in
+# the chain, and Gemini/Groq don't share a field name for this setting. A
+# kwarg unrecognized by the active provider's underlying SDK client raises
+# from inside that provider's _generate(), which RunnableWithFallbacks
+# swallows and replaces with the *first* (Gemini) error — silently breaking
+# fallback while looking, from the caller's perspective, like Groq was
+# never attempted at all.
+DEFAULT_MAX_OUTPUT_TOKENS = 3072
+
 # ---------------------------------------------------------------------------
 # Custom exception
 # ---------------------------------------------------------------------------
@@ -73,7 +86,7 @@ def _is_quota_or_api_error(exc: Exception) -> bool:
 # LLM builders
 # ---------------------------------------------------------------------------
 
-def _build_gemini():
+def _build_gemini(max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS):
     """Build the primary Gemini 2.0 Flash Lite client."""
     from langchain_google_genai import ChatGoogleGenerativeAI
     from app.core.config import settings
@@ -85,16 +98,20 @@ def _build_gemini():
             "Get a free key at https://aistudio.google.com/app/apikey"
         )
 
-    logger.info("[LLM] Initializing primary: gemini-2.0-flash-lite")
+    logger.info(
+        "[LLM] Initializing primary: gemini-2.0-flash-lite (max_output_tokens=%d)",
+        max_output_tokens,
+    )
     return ChatGoogleGenerativeAI(
         model="gemini-2.0-flash-lite",   # cheapest Gemini, ample free quota
         temperature=0,
         google_api_key=api_key,
         max_retries=2,                   # built-in HTTP-level retry for transient errors
+        max_output_tokens=max_output_tokens,
     )
 
 
-def _build_groq():
+def _build_groq(max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS):
     """Build the Groq fallback client (llama-3.3-70b-versatile, free tier)."""
     from langchain_groq import ChatGroq
     from app.core.config import settings
@@ -106,12 +123,51 @@ def _build_groq():
             "Get a free key at https://console.groq.com/keys"
         )
 
-    logger.warning("[LLM] Preparing Groq fallback: llama-3.3-70b-versatile")
+    logger.warning(
+        "[LLM] Preparing Groq fallback: llama-3.3-70b-versatile (max_tokens=%d)",
+        max_output_tokens,
+    )
     return ChatGroq(
         model="llama-3.3-70b-versatile",  # best free Groq model for structured output
         temperature=0,
         groq_api_key=api_key,
+        max_tokens=max_output_tokens,      # NOTE: ChatGroq's field is max_tokens,
+                                            # NOT max_output_tokens (that's Gemini's
+                                            # field name) — this distinction is the
+                                            # root cause this constructor-time wiring
+                                            # is specifically designed to avoid.
     )
+
+
+# ---------------------------------------------------------------------------
+# Logging wrapper
+# ---------------------------------------------------------------------------
+
+def _with_invocation_logging(model, label: str):
+    """
+    Wrap a chat model so every .invoke() call logs when it starts, succeeds,
+    or fails — by label ("Gemini" / "Groq (fallback)"). This is the only
+    reliable way to see what RunnableWithFallbacks is actually doing
+    internally: its own .invoke() only ever re-raises the *first*
+    provider's exception on total failure, which previously made it look
+    like the fallback was never attempted even when it was (and failed for
+    its own, separate reason). Wrapping each provider individually gives
+    full visibility into both attempts regardless of which exception
+    ultimately surfaces to the caller.
+    """
+    from langchain_core.runnables import RunnableLambda
+
+    def _invoke(messages):
+        logger.info("[LLM] %s invocation started", label)
+        try:
+            result = model.invoke(messages)
+            logger.info("[LLM] %s succeeded", label)
+            return result
+        except Exception as exc:
+            logger.error("[LLM] %s failed: %s", label, exc)
+            raise
+
+    return RunnableLambda(_invoke)
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +204,13 @@ def get_llm():
             logger.warning("[LLM] Groq not available: %s", e)
 
         if gemini and groq:
-            # Best case: Gemini primary with automatic Groq fallback
-            _llm = gemini.with_fallbacks([groq])
+            # Best case: Gemini primary with automatic Groq fallback. Both
+            # providers are wrapped with invocation logging so a failed
+            # fallback attempt is never silently invisible the way it was
+            # before — see _with_invocation_logging() docstring.
+            _llm = _with_invocation_logging(gemini, "Gemini").with_fallbacks(
+                [_with_invocation_logging(groq, "Groq (fallback)")]
+            )
             logger.info("[LLM] Ready: Gemini (primary) + Groq (fallback)")
         elif gemini:
             # Gemini only, no fallback
