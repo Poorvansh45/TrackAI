@@ -1,18 +1,11 @@
 """
-Topic Content Service — Tracks AI
+Topic Content Service - Tracks AI
 ===================================
-Generates REAL, topic-specific content for any topic using Gemini.
-
-Returns:
-  - overview           (3-4 sentence intro, specific to this exact topic)
-  - why_it_matters     (5 concrete, topic-specific reasons)
-  - subtopics          (5 real subtopic titles for this topic)
-  - summary            (5 key takeaway bullets)
-  - key_concepts       (5 term → definition pairs)
+Generates topic-specific educational content via the LLM Gateway.
+Routes to Groq (fast, free) instead of direct Gemini calls.
 
 Cache: MongoDB collection "topic_content", TTL 90 days.
-Fallback: If LLM fails, returns a clearly-labelled minimal placeholder
-          (NOT generic marketing copy — just honest minimal content).
+Fallback: If LLM fails, returns an honest minimal placeholder.
 """
 
 import logging
@@ -22,58 +15,8 @@ from typing import Optional
 
 logger = logging.getLogger("uvicorn.error")
 
-# ─── Prompt ─────────────────────────────────────────────────────────────────
 
-CONTENT_PROMPT = '''You are an expert programming educator.
-Generate accurate, specific educational content for the topic: "{topic_name}"
-in the context of learning: "{skill}".
-
-Return ONLY valid JSON — no markdown, no code fences, no extra text.
-
-{{
-  "overview": "3-4 sentences explaining exactly what {topic_name} is, how it works, and what makes it important. Be concrete and specific — mention actual syntax or mechanisms.",
-  "why_it_matters": [
-    "Specific reason 1 why {topic_name} matters (mention real use case)",
-    "Specific reason 2",
-    "Specific reason 3",
-    "Specific reason 4",
-    "Specific reason 5"
-  ],
-  "subtopics": [
-    "Real subtopic title 1 for {topic_name}",
-    "Real subtopic title 2",
-    "Real subtopic title 3",
-    "Real subtopic title 4",
-    "Real subtopic title 5"
-  ],
-  "summary": [
-    "Key takeaway 1 about {topic_name} — concrete fact or rule",
-    "Key takeaway 2",
-    "Key takeaway 3",
-    "Key takeaway 4",
-    "Key takeaway 5"
-  ],
-  "key_concepts": [
-    {{"term": "technical term 1", "definition": "precise 4-7 word definition"}},
-    {{"term": "technical term 2", "definition": "precise 4-7 word definition"}},
-    {{"term": "technical term 3", "definition": "precise 4-7 word definition"}},
-    {{"term": "technical term 4", "definition": "precise 4-7 word definition"}},
-    {{"term": "technical term 5", "definition": "precise 4-7 word definition"}}
-  ]
-}}
-
-RULES:
-- Every sentence must be specific to {topic_name}, never generic
-- subtopics must be real learnable sub-topics (e.g. for "Variables": "Naming Conventions", "Type Inference", "Scope Rules", "Multiple Assignment", "Constants")
-- key_concepts must be real technical terms from {topic_name}
-- overview must mention actual syntax, pattern, or mechanism
-- why_it_matters must cite real programming scenarios
-- No bullet points in overview — plain prose only
-- Return raw JSON only'''
-
-
-# ─── MongoDB cache ────────────────────────────────────────────────────────────
-
+# MongoDB cache helpers
 async def _get_cached_content(topic_id: str) -> Optional[dict]:
     try:
         from app.core.database import get_database
@@ -109,31 +52,22 @@ async def _cache_content(topic_id: str, content: dict) -> None:
         logger.warning("[TopicContent] Cache write failed: %s", exc)
 
 
-# ─── LLM generation ──────────────────────────────────────────────────────────
+async def _generate_via_gateway(topic_name: str, skill: str) -> dict:
+    """Generate topic content via LLM Gateway (Groq-routed task). Fully async."""
+    import json
+    import re
+    from app.core.ai_service import ai_service, prompts, Task
 
-async def _generate_via_llm(topic_name: str, skill: str) -> dict:
-    import asyncio
-    from langchain_core.messages import HumanMessage
+    prompt = prompts.topic_content(topic_name=topic_name, skill=skill)
+    raw = await ai_service.generate(task=Task.TOPIC_OVERVIEW, prompt=prompt, use_cache=False)
 
-    prompt = CONTENT_PROMPT.format(topic_name=topic_name, skill=skill)
-
-    def _sync():
-        from app.tracks.llm.gemini import get_llm
-        llm = get_llm()
-        resp = llm.invoke([HumanMessage(content=prompt)])
-        return resp.content if hasattr(resp, "content") else str(resp)
-
-    loop = asyncio.get_event_loop()
-    raw = await loop.run_in_executor(None, _sync)
-
-    # Strip markdown fences
+    # Strip markdown fences if present
     raw = re.sub(r"```json\s*", "", raw)
     raw = re.sub(r"```\s*", "", raw)
     raw = raw.strip()
 
     data = json.loads(raw)
 
-    # Validate shape
     required = {"overview", "why_it_matters", "subtopics", "summary", "key_concepts"}
     if not required.issubset(data.keys()):
         raise ValueError(f"Missing keys: {required - set(data.keys())}")
@@ -142,10 +76,7 @@ async def _generate_via_llm(topic_name: str, skill: str) -> dict:
 
 
 def _minimal_fallback(topic_name: str) -> dict:
-    """
-    Honest minimal content when the LLM is unavailable.
-    Does NOT use generic marketing copy.
-    """
+    """Honest minimal content when the LLM is unavailable."""
     return {
         "overview": (
             f"{topic_name} content is temporarily unavailable. "
@@ -183,27 +114,23 @@ def _minimal_fallback(topic_name: str) -> dict:
     }
 
 
-# ─── Public API ──────────────────────────────────────────────────────────────
-
 async def get_topic_content(topic_id: str, topic_name: str, skill: str = "Programming") -> dict:
     """
     Returns dynamic, LLM-generated content for any topic.
-    Priority: MongoDB cache → Gemini LLM → minimal fallback
+    Priority: MongoDB cache -> LLM Gateway (Groq) -> minimal fallback
     """
     topic_id = topic_id.lower().strip()
 
-    # 1. Cache
     cached = await _get_cached_content(topic_id)
     if cached:
         logger.info("[TopicContent] Cache hit: %s", topic_id)
         return cached
 
-    # 2. LLM
     try:
-        content = await _generate_via_llm(topic_name, skill)
+        content = await _generate_via_gateway(topic_name, skill)
         await _cache_content(topic_id, content)
-        logger.info("[TopicContent] LLM generated content for: %s", topic_id)
+        logger.info("[TopicContent] Generated via gateway for: %s", topic_id)
         return content
     except Exception as exc:
-        logger.warning("[TopicContent] LLM failed for %s: %s", topic_id, exc)
+        logger.warning("[TopicContent] Gateway failed for %s: %s", topic_id, exc)
         return _minimal_fallback(topic_name)

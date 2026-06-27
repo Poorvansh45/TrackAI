@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Brain, Target, TrendingUp, Mail, Lock, Sparkles } from "lucide-react";
 import api from "@/lib/api";
+import { getErrorMessage } from "@/lib/utils";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function LoginPage() {
       // Land on home or redirected page
       window.location.replace(redirectPath);
     } catch (error: any) {
-      setError(error.response?.data?.detail || "Login failed");
+      setError(getErrorMessage(error));
       console.error(error);
     } finally {
       setLoading(false);

@@ -99,7 +99,15 @@ export function RoadmapGeneration({ data, onNext }: RoadmapGenerationProps) {
           let detail = `Server error ${response.status}`
           try {
             const body = await response.json()
-            if (body?.detail) detail = body.detail
+            if (body?.detail) {
+              if (typeof body.detail === "string") {
+                detail = body.detail
+              } else if (body.detail.message) {
+                detail = body.detail.message
+              } else {
+                detail = JSON.stringify(body.detail)
+              }
+            }
           } catch { /* ignore parse error */ }
           throw new Error(detail)
         }

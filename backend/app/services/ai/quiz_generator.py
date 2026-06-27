@@ -2,8 +2,12 @@
 Quiz Generator Service — Tracks AI
 ====================================
 
-Generates a pool of 30–40 MCQ questions for a topic using Gemini only once.
-Stores in MongoDB. Idempotent — will not regenerate if pool already exists.
+Generates a pool of 15–40 MCQ questions for a topic via the LLM Gateway.
+Routed to Groq (llama-3.1-8b-instant) — NOT Gemini — preserving Gemini
+quota for high-quality roadmap/assessment generation.
+
+Explanations are NOT included in batch generation — they are generated
+on-demand only when a user answers incorrectly (saves ~40% of tokens).
 
 Question format (per question):
 {
@@ -11,10 +15,9 @@ Question format (per question):
     "question":     str,
     "options":      [{"key": "A", "text": str}, ...],  # always 4 options
     "answer":       str,          # "A" | "B" | "C" | "D"
-    "explanation":  str,
+    "explanation":  str,          # empty string until answered incorrectly
     "difficulty":   "easy" | "medium" | "hard"
-}
-"""
+}"""
 
 import asyncio
 import json
@@ -27,7 +30,7 @@ from typing import Optional
 logger = logging.getLogger("uvicorn.error")
 
 # Pool size bounds
-POOL_MIN = 30
+POOL_MIN = 15
 POOL_MAX = 40
 
 # Each LLM call asks for this many questions. Small enough to comfortably
@@ -63,7 +66,7 @@ def _difficulty_mix_for_batch(batch_index: int, batch_size: int) -> str:
     return f"{counts['easy']} easy, {counts['medium']} medium, {counts['hard']} hard"
 
 
-def _build_batch_prompt(topic_name: str, skill: str, count: int, difficulty_mix: str) -> str:
+def _build_batch_prompt(topic_name: str, skill: str, count: int, difficulty_mix: str, existing_questions: list[dict] = None) -> str:
     """
     Build a single-batch prompt. Deliberately short and strict — fewer
     instructions and a smaller requested count both reduce the model's odds
@@ -74,13 +77,23 @@ def _build_batch_prompt(topic_name: str, skill: str, count: int, difficulty_mix:
     copies extraneous formatting (like trailing commas) from a prettified
     example.
     """
-    return (
+    prompt = (
         f'Generate exactly {count} multiple-choice quiz questions about '
         f'"{topic_name}" ({skill}).\n\n'
         f"Difficulty mix: {difficulty_mix}\n"
         "Each question needs exactly 4 options (A-D), one correct answer, "
         "and a 1-sentence explanation. Questions must be unique, clear, and "
         "test real understanding — no trick questions.\n\n"
+    )
+    if existing_questions:
+        titles = [q["question"].strip() for q in existing_questions if "question" in q]
+        if titles:
+            prompt += "CRITICAL: Do NOT generate questions that are identical or very similar to any of these existing questions:\n"
+            for t in titles:
+                prompt += f"- {t}\n"
+            prompt += "\n"
+
+    prompt += (
         "Respond with ONLY raw JSON. No markdown fences, no commentary, "
         "nothing before or after it. Exact shape:\n"
         '{"questions":[{"question":"...","options":['
@@ -88,32 +101,20 @@ def _build_batch_prompt(topic_name: str, skill: str, count: int, difficulty_mix:
         '{"key":"C","text":"..."},{"key":"D","text":"..."}],'
         '"answer":"A","explanation":"...","difficulty":"medium"}]}'
     )
+    return prompt
 
 
-# ─── LLM call ────────────────────────────────────────────────────────────────
-
-def _sync_generate(prompt: str) -> str:
-    """Run the LLM synchronously (called via executor)."""
-    from langchain_core.messages import HumanMessage
-    from app.tracks.llm.gemini import get_llm
-
-    # NOTE: the output-token ceiling is no longer applied here via .bind().
-    # Binding a single kwarg name onto the combined Gemini+Groq fallback
-    # runnable injected it into BOTH providers' invoke() calls, but Gemini's
-    # field is `max_output_tokens` while Groq's is `max_tokens` — Groq's
-    # underlying SDK client rejected the unrecognized kwarg, and
-    # RunnableWithFallbacks silently swallowed that failure and re-raised
-    # only Gemini's original error, making it look like Groq was never
-    # attempted. The token ceiling is now set correctly per-provider at
-    # construction time in app/tracks/llm/gemini.py instead.
-    llm = get_llm()
-    resp = llm.invoke([HumanMessage(content=prompt)])
-    return resp.content if hasattr(resp, "content") else str(resp)
-
+# ─── LLM call ────────────────────────────────────────────────────────────────────────────────
 
 async def _call_llm(prompt: str) -> str:
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _sync_generate, prompt)
+    """
+    Async gateway call — routes to Groq (QUIZ_GENERATION task).
+    Awaits the gateway directly: no executors, no sync wrappers.
+    """
+    import asyncio as _asyncio
+    from app.core.ai_service import ai_service, Task
+    await _asyncio.sleep(1.0)  # inter-batch pacing to stay under Groq 30 RPM limit
+    return await ai_service.generate(task=Task.QUIZ_GENERATION, prompt=prompt, use_cache=False)
 
 
 # ─── Response parser ─────────────────────────────────────────────────────────
@@ -364,15 +365,14 @@ def _parse_questions(raw: str) -> list[dict]:
 def _validate_questions(questions: list) -> list[dict]:
     """
     Strictly validate each question dict against the required schema.
-    This is the exact same validation logic _parse_questions has always
-    used — factored out so generate_quiz_pool() can call it per-batch and
-    log per-batch validation counts without duplicating the rules.
+    Explanation field is optional — empty string is fine (generated on demand).
     """
     valid = []
     for q in questions:
         if not isinstance(q, dict):
             continue
-        if not all(k in q for k in ("question", "options", "answer", "explanation")):
+        # explanation is now optional — only question/options/answer required
+        if not all(k in q for k in ("question", "options", "answer")):
             continue
         if len(q.get("options", [])) != 4:
             continue
@@ -387,7 +387,7 @@ def _validate_questions(questions: list) -> list[dict]:
             "question": q["question"].strip(),
             "options": q["options"],
             "answer": q["answer"],
-            "explanation": q.get("explanation", "").strip(),
+            "explanation": q.get("explanation", "").strip(),  # empty until answered wrong
             "difficulty": q.get("difficulty", "medium"),
         })
 
@@ -422,7 +422,7 @@ async def generate_quiz_pool(topic_id: str, topic_name: str, skill: str) -> list
         count = min(BATCH_SIZE, remaining_needed)
         difficulty_mix = _difficulty_mix_for_batch(batch_index, count)
 
-        prompt = _build_batch_prompt(topic_name, skill, count, difficulty_mix)
+        prompt = _build_batch_prompt(topic_name, skill, count, difficulty_mix, existing_questions=pool)
         logger.info(
             "[QUIZ GEN] Batch %d/%d: requesting %d questions for topic_id=%s",
             batch_index + 1, MAX_BATCH_ATTEMPTS, count, topic_id,
@@ -471,3 +471,22 @@ async def generate_quiz_pool(topic_id: str, topic_name: str, skill: str) -> list
         len(pool), topic_id, batch_index, batch_failures,
     )
     return pool
+
+
+async def generate_and_cache_quiz(
+    topic_id: str,
+    topic_name: str,
+    skill: str,
+    count: int = 5,
+) -> list[dict]:
+    """
+    Lightweight helper used by the background queue to pre-generate a small
+    quiz for the first topic of a new roadmap and cache it in MongoDB.
+    Uses the full generate_quiz_pool pipeline but limits scope to `count` questions.
+    """
+    try:
+        pool = await generate_quiz_pool(topic_id=topic_id, topic_name=topic_name, skill=skill)
+        return pool[:count]
+    except Exception as exc:
+        logger.warning("[QUIZ GEN] generate_and_cache_quiz failed for %s: %s", topic_id, exc)
+        return []

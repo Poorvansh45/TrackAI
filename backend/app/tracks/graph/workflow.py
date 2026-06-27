@@ -1,13 +1,13 @@
-"""
-LangGraph workflow — Tracks AI.
-Source: TaskAI backend/src/graph/workflow.py
+﻿"""
+LangGraph workflow - Tracks AI.
+All nodes are async. Uses graph.ainvoke() — no blocking, no executors.
 
 Wiring:
     START -> assessment -> prerequisite -> roadmap -> timeline -> END
 
 Exports:
     graph                    — compiled StateGraph (importable by FastAPI route)
-    run_tracks_ai_workflow   — sync convenience wrapper around graph.invoke()
+    run_tracks_ai_workflow   — async convenience wrapper around graph.ainvoke()
 """
 
 from langgraph.graph import StateGraph, START, END
@@ -36,7 +36,7 @@ builder.add_edge("roadmap", "timeline")
 builder.add_edge("timeline", END)
 
 # ---------------------------------------------------------------------------
-# Compile (module-level — compiled once on import)
+# Compile once at module load
 # ---------------------------------------------------------------------------
 
 graph = builder.compile()
@@ -46,22 +46,18 @@ graph = builder.compile()
 # Public API
 # ---------------------------------------------------------------------------
 
-def run_tracks_ai_workflow(input_data: dict) -> dict:
+async def run_tracks_ai_workflow(input_data: dict) -> dict:
     """
-    Run the full Tracks AI pipeline synchronously.
+    Run the full Tracks AI pipeline asynchronously via LangGraph ainvoke().
+    Awaited directly from the FastAPI endpoint — no executor needed.
 
     Args:
         input_data: dict with keys:
-            - skill (str)                e.g. "AI/ML"
-            - assessment_answers (dict)  question-id -> answer string
-            - user_preferences (dict)    daily_hours, weekly_availability,
-                                         learning_style, goal
+            - skill (str)
+            - assessment_answers (dict)
+            - user_preferences (dict)
 
     Returns:
-        Final TracksAIState as a dict, including:
-            - assessment_result
-            - prerequisite_result
-            - roadmap_result
-            - timeline_result
+        Final TracksAIState as a dict with all result keys.
     """
-    return graph.invoke(input_data)
+    return await graph.ainvoke(input_data)

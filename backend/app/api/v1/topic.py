@@ -116,27 +116,8 @@ def _infer_time(difficulty: str) -> str:
     return {"Beginner": "1.5 Hours", "Intermediate": "2.5 Hours", "Advanced": "4 Hours"}.get(difficulty, "2 Hours")
 
 
-# ─── Explain prompts + fallbacks ─────────────────────────────────────────────
-
-EXPLAIN_PROMPTS = {
-    "eli12": (
-        "You are a patient tutor explaining to a 12-year-old. "
-        "Use simple words, a fun analogy, and short sentences. Max 120 words. "
-        "Topic: {topic}"
-    ),
-    "real_example": (
-        "Give ONE concrete real-life example that explains: {topic}. "
-        "Use something tangible (phones, games, food, money). Under 100 words. Be vivid."
-    ),
-    "analogy": (
-        "Create ONE strong visual analogy that explains: {topic}. "
-        "Use a physical object or scene. Under 100 words. Make it memorable."
-    ),
-    "simplify": (
-        "Give the absolute minimum explanation of: {topic}. "
-        "Bullet points preferred. Under 80 words. Core idea + one tiny example."
-    ),
-}
+# Explain prompts are now managed centrally in app/core/prompts/explain.py
+# and accessed via the PromptManager (imported lazily below).
 
 
 # ─── Endpoints ──────────────────────────────────────────────────────────────
@@ -264,19 +245,25 @@ async def get_progress(topic_id: str, user_id: Optional[str] = None):
 
 @router.post("/explain", response_model=ExplainResponse)
 async def explain_topic(payload: ExplainRequest):
-    valid_modes = {"eli12", "real_example", "analogy", "simplify"}
-    mode = payload.mode.lower().strip()
-    if mode not in valid_modes:
-        raise HTTPException(status_code=422, detail=f"Invalid mode. Choose: {', '.join(valid_modes)}")
+    from app.core.ai_service import ai_service, prompts, Task
+    from app.core.prompts.explain import VALID_MODES
 
-    prompt = EXPLAIN_PROMPTS[mode].format(topic=payload.topic)
+    mode = payload.mode.lower().strip()
+    if mode not in VALID_MODES:
+        raise HTTPException(status_code=422, detail=f"Invalid mode. Choose: {', '.join(VALID_MODES)}")
+
     try:
-        explanation = await _llm_explain(prompt)
+        prompt = prompts.explain(topic=payload.topic, mode=mode)
+        explanation = await ai_service.async_generate(
+            task=Task.RE_EXPLAIN,
+            prompt=prompt,
+            use_cache=False,  # personalised — do not cache
+        )
         if not explanation or len(explanation.strip()) < 15:
             raise ValueError("Empty response")
     except Exception as exc:
-        logger.warning("[Explain] LLM failed for '%s' mode=%s: %s", payload.topic, mode, exc)
-        explanation = f"Unable to generate explanation right now. Please try again in a moment."
+        logger.warning("[Explain] Gateway failed for '%s' mode=%s: %s", payload.topic, mode, exc)
+        explanation = "Unable to generate explanation right now. Please try again in a moment."
 
     return ExplainResponse(explanation=explanation.strip(), mode=mode)
 
@@ -314,14 +301,3 @@ def _empty_progress(topic_id: str) -> TopicProgressState:
     )
 
 
-async def _llm_explain(prompt: str) -> str:
-    import asyncio
-    from langchain_core.messages import HumanMessage
-
-    def _sync():
-        from app.tracks.llm.gemini import get_llm
-        llm = get_llm()
-        resp = llm.invoke([HumanMessage(content=prompt)])
-        return resp.content if hasattr(resp, "content") else str(resp)
-
-    return await asyncio.get_event_loop().run_in_executor(None, _sync)

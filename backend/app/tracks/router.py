@@ -100,8 +100,39 @@ async def generate_roadmap(payload: GenerateRoadmapRequest):
     We run it in a thread pool executor so FastAPI's async event loop
     is not blocked for other requests.
     """
+    import hashlib
+    import json
+    from app.core.database import get_database
+
     # Resolve human-readable skill name for the LLM
     skill_label = SKILL_LABELS.get(payload.skill, payload.skill)
+
+    # Generate stable cache key based on payload contents
+    cache_dict = {
+        "skill": payload.skill,
+        "assessment_answers": dict(sorted(payload.assessment_answers.items())),
+        "user_preferences": payload.user_preferences.model_dump(),
+    }
+    cache_dict["user_preferences"] = dict(sorted(cache_dict["user_preferences"].items()))
+    cache_key = hashlib.md5(json.dumps(cache_dict, sort_keys=True).encode("utf-8")).hexdigest()
+
+    # Try to serve from database cache
+    db = get_database()
+    if db is not None:
+        try:
+            cached_result = await db["generated_roadmaps"].find_one({"cache_key": cache_key})
+            if cached_result:
+                logger.info("[GenerateRoadmap] Serving roadmap from MongoDB cache (key: %s)", cache_key)
+                return GenerateRoadmapResponse(
+                    success=True,
+                    skill=skill_label,
+                    assessment_result=cached_result["assessment_result"],
+                    prerequisite_result=cached_result["prerequisite_result"],
+                    roadmap_result=cached_result["roadmap_result"],
+                    timeline_result=cached_result["timeline_result"],
+                )
+        except Exception as e:
+            logger.warning("[GenerateRoadmap] Cache read failed: %s", e)
 
     # Build the workflow input dict
     input_data = {
@@ -116,12 +147,42 @@ async def generate_roadmap(payload: GenerateRoadmapRequest):
     }
 
     try:
-        # Import here to avoid circular import at module load time
         from app.tracks.graph.workflow import run_tracks_ai_workflow
 
-        # Run blocking LangGraph workflow in thread pool
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, run_tracks_ai_workflow, input_data)
+        # Fully async pipeline — await directly, no executor needed
+        result = await run_tracks_ai_workflow(input_data)
+
+        # Store result in cache
+        if db is not None:
+            try:
+                await db["generated_roadmaps"].update_one(
+                    {"cache_key": cache_key},
+                    {
+                        "$set": {
+                            "cache_key": cache_key,
+                            "assessment_result": result.get("assessment_result", {}),
+                            "prerequisite_result": result.get("prerequisite_result", {}),
+                            "roadmap_result": result.get("roadmap_result", {}),
+                            "timeline_result": result.get("timeline_result", {}),
+                        }
+                    },
+                    upsert=True,
+                )
+                logger.info("[GenerateRoadmap] Successfully cached generated roadmap (key: %s)", cache_key)
+            except Exception as e:
+                logger.warning("[GenerateRoadmap] Cache write failed: %s", e)
+
+        # Trigger background pre-generation for the first topic
+        try:
+            from app.core.llm.queue import enqueue_post_roadmap_tasks
+            asyncio.create_task(
+                enqueue_post_roadmap_tasks(
+                    roadmap_result=result.get("roadmap_result", {}),
+                    skill=skill_label,
+                )
+            )
+        except Exception as e:
+            logger.warning("[GenerateRoadmap] Queue scheduling failed: %s", e)
 
     except Exception as exc:
         from app.tracks.llm.gemini import QuotaExhaustedError, _is_quota_or_api_error

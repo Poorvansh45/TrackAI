@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Brain, Target, TrendingUp, User, Mail, Lock, Sparkles } from "lucide-react";
 import api from "@/lib/api";
+import { getErrorMessage } from "@/lib/utils";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export default function RegisterPage() {
       localStorage.setItem("user", JSON.stringify(response.data.user));
       window.location.replace(redirectPath);
     } catch (error: any) {
-      setError(error.response?.data?.detail || "Registration failed");
+      setError(getErrorMessage(error));
     } finally {
       setLoading(false);
     }

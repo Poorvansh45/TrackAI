@@ -1,7 +1,15 @@
 import json
+import os
 from typing import List, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+
+# Resolve absolute path to backend/.env and load environment variables
+base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+env_path = os.path.join(base_dir, ".env")
+load_dotenv(env_path)
+
 
 
 class Settings(BaseSettings):

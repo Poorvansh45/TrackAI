@@ -18,7 +18,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             detail="Invalid token"
         )
 
-    user_id = payload.get("sub")
+    user_id = payload.get("sub") or payload.get("user_id")
     print("USER ID:", user_id)
 
     if not user_id:
