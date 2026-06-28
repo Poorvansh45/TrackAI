@@ -40,7 +40,7 @@ export function AIAssistantPanel({ phases, skill }: AIAssistantPanelProps) {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
-      className="glass-panel p-5 flex flex-col gap-4 h-fit lg:sticky lg:top-20"
+      className="glass-panel p-5 flex flex-col gap-4 h-fit"
     >
       {/* Header */}
       <div>

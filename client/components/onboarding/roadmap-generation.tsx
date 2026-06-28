@@ -86,7 +86,7 @@ export function RoadmapGeneration({ data, onNext }: RoadmapGenerationProps) {
           },
         }
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
 
         const response = await fetch(`${apiUrl}/tracks/generate`, {
           method:  "POST",
@@ -176,7 +176,7 @@ export function RoadmapGeneration({ data, onNext }: RoadmapGenerationProps) {
           <div className="surface-card p-4 text-left space-y-1">
             <p className="text-mono text-[9px] text-foreground-subtle uppercase font-semibold mb-2">Checklist</p>
             {[
-              "Backend running on http://127.0.0.1:8000",
+              "Backend running on http://localhost:8000",
               "GOOGLE_API_KEY set in backend/.env (AIza… format)",
               "Internet connection is active",
             ].map((item, i) => (

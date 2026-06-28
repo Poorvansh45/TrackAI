@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Flame, Zap, Clock, Trophy, TrendingUp, Activity, Target, Calendar } from "lucide-react"
+import { Flame, Zap, Clock, Trophy, TrendingUp, Activity, Target, Calendar, ChevronRight } from "lucide-react"
 
 interface TrackInfoPanelProps {
   skill: string
@@ -103,7 +103,7 @@ export function TrackInfoPanel({
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="glass-panel p-5 flex flex-col gap-5 h-fit lg:sticky lg:top-20"
+      className="glass-panel p-5 flex flex-col gap-5 h-fit"
     >
       {/* Track Badge */}
       <div>
@@ -177,6 +177,20 @@ export function TrackInfoPanel({
           <p className="text-mono text-[8px] text-foreground-subtle mt-1 text-right">
             {totalXP} / {xpTarget} XP
           </p>
+        </div>
+
+        {/* Learning Streak */}
+        <div className="ai-item px-3 py-2.5 flex items-center justify-between hover:border-warning/45 transition-all duration-300 group cursor-pointer">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md bg-warning/15 border border-warning/30 flex items-center justify-center flex-shrink-0">
+              <Flame className="w-4 h-4 text-warning fill-warning/20 animate-pulse" />
+            </div>
+            <div>
+              <p className="text-[12px] font-bold text-foreground leading-none">7 Days</p>
+              <p className="text-[9px] text-foreground-subtle mt-0.5">Keep it up!</p>
+            </div>
+          </div>
+          <ChevronRight className="w-3.5 h-3.5 text-foreground-subtle/50 group-hover:text-warning group-hover:translate-x-0.5 transition-all duration-200" />
         </div>
 
         {/* Completed topics stat */}

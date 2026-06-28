@@ -98,7 +98,7 @@ function getRoadmapSkill(): string {
 /** Fetch topic data from backend (with real resources) */
 async function fetchTopicData(topicId: string): Promise<TopicData | null> {
   try {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
     const res = await fetch(`${apiBase}/topic/${topicId}`, {
       cache: "no-store",
     })

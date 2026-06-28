@@ -35,7 +35,7 @@ export function AIMentorCard() {
       </div>
 
       {/* Action button */}
-      <Link href="/dashboard" className="block">
+      <Link href="/dashboard/mentor" className="block">
         <button className="w-full bg-accent hover:bg-accent-hover text-accent-foreground rounded-md h-9 px-4 text-[12px] font-medium transition-colors flex items-center justify-center gap-1.5">
           <MessageSquare className="w-3.5 h-3.5" />
           Consult Mentor

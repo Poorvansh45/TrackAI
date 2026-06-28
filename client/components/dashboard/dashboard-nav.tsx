@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Bell, Search } from "lucide-react"
+import { Bell } from "lucide-react"
 import { ProfileDropdown } from "./profile-dropdown"
 
 export function DashboardNav() {
@@ -19,19 +19,6 @@ export function DashboardNav() {
               Tracks AI
             </span>
           </Link>
-        </div>
-
-        {/* Cmd+K search */}
-        <div className="hidden md:flex flex-1 max-w-[280px] mx-8">
-          <button className="w-full flex items-center justify-between bg-surface-1/40 hover:bg-surface-1 border border-border/80 px-2.5 py-1 rounded-md text-[11px] text-foreground-muted hover:text-foreground transition-colors group">
-            <div className="flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5 text-foreground-subtle" />
-              <span>Search platform...</span>
-            </div>
-            <kbd className="text-mono text-[9px] text-foreground-subtle bg-surface-2 border border-border px-1.5 py-0.5 rounded leading-none">
-              ⌘K
-            </kbd>
-          </button>
         </div>
 
         {/* Actions */}

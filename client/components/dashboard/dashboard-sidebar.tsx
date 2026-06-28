@@ -11,7 +11,8 @@ import {
   Settings,
   HelpCircle,
   CalendarDays,
-  Lock
+  Lock,
+  MessageSquare
 } from "lucide-react"
 import { useRoadmap } from "@/hooks/use-roadmap"
 import { useAvailableQuizzes } from "@/hooks/use-quiz"
@@ -23,6 +24,7 @@ const sidebarItems = [
   { name: "Quizzes",     href: "/dashboard/quiz",      icon: Target, showBadge: true },
   { name: "Smart Notes", href: "/dashboard/notes",     icon: FileText },
   { name: "Analytics",   href: "/dashboard/analytics", icon: BarChart3 },
+  { name: "Mentor AI",   href: "/dashboard/mentor",    icon: MessageSquare },
 ]
 
 export function DashboardSidebar() {
@@ -49,12 +51,12 @@ export function DashboardSidebar() {
                 isLocked
                   ? "text-foreground-subtle/30 cursor-not-allowed hover:bg-transparent"
                   : isActive
-                    ? "text-foreground bg-surface-2"
+                    ? "text-foreground bg-gradient-to-r from-violet-500/10 to-orange-500/10 border-y border-r border-violet-500/30 font-semibold"
                     : "text-foreground-muted hover:text-foreground hover:bg-surface-1"
               }`}
             >
               {isActive && !isLocked && (
-                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent" />
+                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-violet-500 to-orange-500" />
               )}
               <div className="relative flex-shrink-0">
                 <item.icon className="w-4 h-4" />

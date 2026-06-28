@@ -153,8 +153,8 @@ export default function RoadmapPage() {
 
       <div className="relative z-10">
         {/* Hero Section Container (Full bleed) */}
-        <div className="relative border-b border-border/30 bg-gradient-to-b from-accent/[0.04] via-accent/[0.01] to-transparent mb-16">
-          <div className="max-w-[1400px] mx-auto px-10 lg:px-14 pt-12 md:pt-16 pb-12">
+        <div className="relative border-b border-border/30 bg-gradient-to-b from-accent/[0.04] via-accent/[0.01] to-transparent mb-8">
+          <div className="max-w-[1400px] mx-auto px-10 lg:px-14 pt-8 md:pt-10 pb-8">
             {/* Page header inside Hero */}
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -167,7 +167,7 @@ export default function RoadmapPage() {
                 <div className="absolute top-1/2 left-0 -translate-y-1/2 w-72 h-24 bg-accent/10 blur-[80px] rounded-full pointer-events-none" />
 
                 {/* MISSION CONTROL badge */}
-                <div className="mb-5 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/20">
+                <div className="mb-3.5 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/20">
                   <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                   <span className="text-mono text-[9px] text-accent uppercase tracking-widest font-bold">
                     Mission Control
@@ -175,7 +175,7 @@ export default function RoadmapPage() {
                 </div>
 
                 {/* Title */}
-                <h1 className="text-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-4 relative z-10">
+                <h1 className="text-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-2 relative z-10">
                   Learning <span className="text-accent relative" style={{ textShadow: "0 0 30px oklch(0.62 0.20 275 / 0.35)" }}>Roadmap</span>
                 </h1>
 
