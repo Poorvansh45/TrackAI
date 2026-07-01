@@ -1,59 +1,90 @@
 "use client"
 
+import { useMemo } from "react"
 import { motion } from "framer-motion"
-import { Zap, CheckCircle2, Clock, Target } from "lucide-react"
+import { Zap, CheckCircle2, Clock, Flame, ClipboardCheck, Target } from "lucide-react"
 import { useRoadmapProgress } from "@/lib/roadmap-state"
-import { useRouter } from "next/navigation"
+import { deriveDailyProgress } from "@/lib/daily-progress"
+import { useAvailableQuizzes } from "@/hooks/use-quiz"
 
-interface Mission {
-  id: number
-  name: string
-  time: string
-  xp: number
+interface Objective {
+  id: string
+  icon: React.ReactNode
+  label: string
+  detail: string
   status: "done" | "active" | "pending"
-  slug: string
 }
 
 export function DailyMissions() {
-  const router = useRouter()
-  const { data, loading } = useRoadmapProgress()
+  const { data } = useRoadmapProgress()
+  const { quizzes } = useAvailableQuizzes()
 
-  // Build missions directly from backend roadmap_progress — status
-  // (done/active/pending) is read straight from MongoDB, identical to
-  // what the Dashboard's Continue Learning card and Learning Graph show.
-  const missions: Mission[] = []
-  let activeSlug = ""
+  const daily = useMemo(
+    () => (data ? deriveDailyProgress(data) : null),
+    [data]
+  )
 
-  if (data) {
-    const flat = data.phases
-      .flatMap((p) => p.topics)
-      .sort((a, b) => a.order - b.order)
+  // ── Derive today's XP earned ─────────────────────────────────────────────
+  const xpEarnedToday = useMemo(() => {
+    if (!daily) return 0
+    return daily.planTopics
+      .filter((t) => t.completedToday)
+      .reduce((sum, t) => sum + t.xp, 0)
+  }, [daily])
 
-    const activeIdx = flat.findIndex((t) => t.status === "active")
-    activeSlug = flat[activeIdx]?.topic_id || ""
+  const xpTarget = 300
 
-    // Show: 1 completed before active (if exists) + active + 2 upcoming
-    const start = Math.max(0, activeIdx - 1)
-    const windowTopics = flat.slice(start, start + 4)
+  // ── Quiz mission ─────────────────────────────────────────────────────────
+  const readyQuiz = quizzes.find(
+    (q) => q.quiz_status === "READY" || q.quiz_status === "CHALLENGE_AVAILABLE"
+  )
+  const verifiedQuiz = quizzes.find((q) => q.quiz_status === "VERIFIED")
 
-    windowTopics.forEach((topic, i) => {
-      missions.push({
-        id: i + 1,
-        name: `Study: ${topic.topic_name}`,
-        time: "~1.5h",
-        xp: 100,
-        status: topic.status === "completed" ? "done" : topic.status === "active" ? "active" : "pending",
-        slug: topic.topic_id,
-      })
-    })
-  }
+  // ── Study time estimate ──────────────────────────────────────────────────
+  // Approximation: each completed topic ~= 15 min of study
+  const studyMinTarget = 45
+  const studyMinDone = (daily?.completedToday ?? 0) * 15
+  const studyDone = studyMinDone >= studyMinTarget
 
-  const displayMissions: Mission[] =
-    missions.length > 0
-      ? missions
-      : [{ id: 1, name: "Loading missions...", time: "--", xp: 0, status: "pending", slug: "" }]
+  // ── Objective definitions ─────────────────────────────────────────────────
+  const objectives: Objective[] = [
+    {
+      id: "study-time",
+      icon: <Clock className="w-3.5 h-3.5" />,
+      label: `Study ${studyMinTarget}+ minutes`,
+      detail: studyDone
+        ? `${studyMinDone} min logged`
+        : `~${studyMinDone} / ${studyMinTarget} min`,
+      status: studyDone ? "done" : (daily?.completedToday ?? 0) > 0 ? "active" : "pending",
+    },
+    {
+      id: "quiz",
+      icon: <ClipboardCheck className="w-3.5 h-3.5" />,
+      label: "Complete Verification Quiz",
+      detail: verifiedQuiz
+        ? `${verifiedQuiz.topic_name} — verified`
+        : readyQuiz
+        ? `${readyQuiz.topic_name} — ready`
+        : "Complete a topic to unlock",
+      status: verifiedQuiz ? "done" : readyQuiz ? "active" : "pending",
+    },
+    {
+      id: "earn-xp",
+      icon: <Zap className="w-3.5 h-3.5" />,
+      label: `Earn ${xpTarget} XP today`,
+      detail: `${xpEarnedToday} / ${xpTarget} XP`,
+      status: xpEarnedToday >= xpTarget ? "done" : xpEarnedToday > 0 ? "active" : "pending",
+    },
+    {
+      id: "streak",
+      icon: <Flame className="w-3.5 h-3.5" />,
+      label: "Maintain Streak",
+      detail: (daily?.completedToday ?? 0) > 0 ? "Active today ✓" : "Complete any topic",
+      status: (daily?.completedToday ?? 0) > 0 ? "done" : "active",
+    },
+  ]
 
-  const completedCount = displayMissions.filter((m) => m.status === "done").length
+  const completedCount = objectives.filter((o) => o.status === "done").length
 
   return (
     <motion.div
@@ -62,77 +93,88 @@ export function DailyMissions() {
       transition={{ delay: 0.3 }}
       className="surface-card p-5"
     >
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-[13px] font-semibold text-foreground">Today&apos;s Missions</h3>
+          <h3 className="text-[13px] font-semibold text-foreground">Today's Missions</h3>
           <p className="text-mono text-[9px] text-foreground-subtle mt-0.5">
-            {completedCount} of {displayMissions.length} completed
+            {completedCount} of {objectives.length} completed
           </p>
         </div>
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-2 border border-border">
-          <Zap className="w-3 h-3 text-warning" />
-          <span className="text-mono text-[9px] text-warning font-medium">Streak active</span>
+          <Target className="w-3 h-3 text-accent" />
+          <span className="text-mono text-[9px] text-accent font-medium">Objectives</span>
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        {displayMissions.map((mission) => {
-          const isDone = mission.status === "done"
-          const isActive = mission.status === "active"
+      {/* ── Objectives list ───────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        {objectives.map((obj) => {
+          const isDone    = obj.status === "done"
+          const isActive  = obj.status === "active"
+          const isPending = obj.status === "pending"
 
           return (
             <div
-              key={mission.id}
-              onClick={() => {
-                if (mission.slug && !isDone) router.push(`/topic/${mission.slug}`)
-              }}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-md border transition-all ${
-                isActive
-                  ? "bg-surface-2 border-accent/20 cursor-pointer hover:border-accent/40"
-                  : isDone
-                  ? "bg-surface-1/20 border-transparent opacity-60"
+              key={obj.id}
+              className={`flex items-start gap-3 px-3 py-2.5 rounded-md border transition-all ${
+                isDone
+                  ? "bg-success/5 border-success/15"
+                  : isActive
+                  ? "bg-surface-2 border-accent/20"
                   : "bg-surface-1/40 border-transparent"
               }`}
             >
-              {isDone ? (
-                <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
-              ) : isActive ? (
-                <div className="w-4 h-4 rounded-full border-2 border-accent flex-shrink-0 animate-pulse" />
-              ) : (
-                <div className="w-4 h-4 rounded-full border border-border flex-shrink-0" />
-              )}
+              {/* Status orb / icon */}
+              <div className={`flex-shrink-0 mt-0.5 ${
+                isDone ? "text-success" : isActive ? "text-accent" : "text-foreground-subtle/40"
+              }`}>
+                {isDone ? (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                ) : (
+                  <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                    isActive ? "border-accent" : "border-foreground-subtle/30"
+                  }`}>
+                    {isActive && <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
+                  </div>
+                )}
+              </div>
 
+              {/* Content */}
               <div className="flex-1 min-w-0">
-                <span
-                  className={`text-[12px] truncate block ${
-                    isDone ? "text-foreground-subtle line-through" : "text-foreground"
-                  }`}
-                >
-                  {mission.name}
+                <span className={`text-[12px] font-medium block ${
+                  isDone ? "text-success/80" : isPending ? "text-foreground-subtle" : "text-foreground"
+                }`}>
+                  {obj.label}
+                </span>
+                <span className="text-mono text-[9px] text-foreground-subtle block mt-0.5">
+                  {obj.detail}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0 text-mono text-[9px]">
-                <div className="flex items-center gap-0.5 text-foreground-subtle">
-                  <Clock className="w-3 h-3" />
-                  <span>{mission.time}</span>
-                </div>
-                <span className={isDone ? "text-success" : "text-accent"}>+{mission.xp} XP</span>
+              {/* Icon badge */}
+              <div className={`flex-shrink-0 ${
+                isDone ? "text-success" : isActive ? "text-accent" : "text-foreground-subtle/30"
+              }`}>
+                {obj.icon}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* Active topic CTA */}
-      {!loading && activeSlug && (
-        <button
-          onClick={() => router.push(`/topic/${activeSlug}`)}
-          className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-md border border-accent/25 bg-accent/8 hover:bg-accent/15 text-mono text-[10px] text-accent font-semibold transition-all"
+      {/* ── All missions done celebration ─────────────────────────────────── */}
+      {completedCount === objectives.length && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-success/8 border border-success/15"
         >
-          <Target className="w-3.5 h-3.5" />
-          Open: {displayMissions.find((m) => m.slug === activeSlug)?.name.replace("Study: ", "")}
-        </button>
+          <Zap className="w-3 h-3 text-success" />
+          <span className="text-mono text-[9px] font-semibold text-success">
+            All missions complete! Outstanding work.
+          </span>
+        </motion.div>
       )}
     </motion.div>
   )

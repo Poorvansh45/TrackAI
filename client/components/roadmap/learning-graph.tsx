@@ -1,7 +1,7 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { Cpu } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Cpu, CheckCircle2, Zap, ChevronRight } from "lucide-react"
 import { RoadmapNode, type RoadmapNodeData } from "./roadmap-node"
 
 export interface PhaseData {
@@ -136,6 +136,46 @@ export function LearningGraph({ phases, skill, justUnlockedSlugs }: LearningGrap
                 )
               })}
             </div>
+
+            {/* Phase completion banner */}
+            <AnimatePresence>
+              {phaseCompleted && (
+                <motion.div
+                  key={`phase-${phase.phaseNumber}-complete`}
+                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  className="mt-3 rounded-lg border border-success/25 bg-success/8 px-4 py-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-success" />
+                      <div>
+                        <p className="text-[12px] font-semibold text-success">
+                          Phase {phase.phaseNumber} Complete
+                        </p>
+                        <p className="text-mono text-[9px] text-foreground-subtle mt-0.5">
+                          {allNodesInPhase.length} topics mastered
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 text-mono text-[10px] text-success font-semibold">
+                        <Zap className="w-3 h-3" />
+                        +{allNodesInPhase.reduce((sum, n) => sum + (n.xp || 0), 0)} XP
+                      </div>
+                      {pIdx < phases.length - 1 && (
+                        <div className="flex items-center gap-1 text-mono text-[9px] text-foreground-subtle">
+                          <span>Phase {phase.phaseNumber + 1}</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Inter-phase connector */}
             {pIdx < phases.length - 1 && (

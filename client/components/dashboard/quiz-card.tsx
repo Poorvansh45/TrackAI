@@ -133,11 +133,17 @@ export function QuizCard() {
           </div>
         </div>
 
-        <div className="p-3.5 rounded-lg bg-surface-2/60 border border-border/40 mb-4">
+        <div className="p-3.5 rounded-lg bg-surface-2/60 border border-border/40 mb-4 space-y-2">
           <p className="text-[11px] text-foreground-muted leading-relaxed">
-            Finish any topic checklist to automatically generate a 10-question
-            verification quiz.
+            Finish any topic checklist to automatically generate a verification quiz.
           </p>
+          <div className="flex items-center gap-3 text-mono text-[9px] text-foreground-subtle pt-1">
+            <span>10 Questions</span>
+            <span className="w-1 h-1 rounded-full bg-border" />
+            <span>~15 min</span>
+            <span className="w-1 h-1 rounded-full bg-border" />
+            <span className="text-accent font-semibold">Worth up to 300 XP</span>
+          </div>
         </div>
 
         <Link href="/dashboard/quiz">
@@ -269,10 +275,18 @@ export function QuizCard() {
             <span>{featured.xp_reward} XP</span>
           </div>
         </div>
+        {/* Metadata row */}
+        <div className="flex items-center gap-2 text-mono text-[9px] text-foreground-subtle">
+          <span>10 Questions</span>
+          <span className="w-1 h-1 rounded-full bg-border" />
+          <span>~15 min</span>
+          <span className="w-1 h-1 rounded-full bg-border" />
+          <span>{isChallenge ? "Advanced" : isRevision ? "Intermediate" : "Intermediate"}</span>
+        </div>
         <div className="text-[11px] text-foreground-muted">
           {featured.attempt_count > 0
             ? `${featured.attempt_count} attempt${featured.attempt_count > 1 ? "s" : ""} · Last score: ${featured.user_score?.toFixed(0) ?? "—"}%`
-            : "10 questions · No previous attempts"}
+            : "No previous attempts"}
         </div>
       </div>
 

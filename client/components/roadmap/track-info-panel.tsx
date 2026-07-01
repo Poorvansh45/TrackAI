@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Flame, Zap, Clock, Trophy, TrendingUp, Activity, Target, Calendar } from "lucide-react"
+import { Zap, Clock, Trophy, TrendingUp, Activity, Target, Calendar } from "lucide-react"
 
 interface TrackInfoPanelProps {
   skill: string
@@ -11,6 +11,8 @@ interface TrackInfoPanelProps {
   totalNodes: number
   currentPhaseLabel: string
   currentPhaseNumber: number
+  /** Total XP earned — supplied by the backend (sum of xp_earned on completed topics). */
+  totalXP: number
 }
 
 function RingProgress({ pct, size = 88, stroke = 6, color = "oklch(0.62 0.20 275)" }: {
@@ -33,48 +35,17 @@ function RingProgress({ pct, size = 88, stroke = 6, color = "oklch(0.62 0.20 275
   )
 }
 
-/** Read total XP from localStorage topic_progress_* keys */
-function readTotalXPFromStorage(): number {
-  try {
-    let xp = 0
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith("topic_progress_")) {
-        const raw = localStorage.getItem(key)
-        if (raw) {
-          const arr: string[] = JSON.parse(raw)
-          // Full completion = 100 XP; partial = 0 (only rewarded on full)
-          // We check by comparing vs topic subtopics count (assume 5 default)
-          if (arr.length >= 5) xp += 100
-        }
-      }
-    }
-    return xp
-  } catch {
-    return 0
-  }
-}
-
 export function TrackInfoPanel({
   skill, totalPhases, completedNodes, totalNodes,
   currentPhaseLabel, currentPhaseNumber,
+  totalXP,
 }: TrackInfoPanelProps) {
-  const [totalXP, setTotalXP] = useState(0)
   const [prevCompleted, setPrevCompleted] = useState(completedNodes)
   const [xpFlash, setXpFlash] = useState(false)
 
-  // Read XP from localStorage and keep in sync with storage events
-  useEffect(() => {
-    const read = () => setTotalXP(readTotalXPFromStorage())
-    read()
-    window.addEventListener("storage", read)
-    return () => window.removeEventListener("storage", read)
-  }, [])
-
-  // Flash XP when completedNodes increases
+  // Flash XP badge when completedNodes increases (topic just completed)
   useEffect(() => {
     if (completedNodes > prevCompleted) {
-      setTotalXP(readTotalXPFromStorage())
       setXpFlash(true)
       const t = setTimeout(() => setXpFlash(false), 1800)
       setPrevCompleted(completedNodes)

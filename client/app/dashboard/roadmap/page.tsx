@@ -37,6 +37,8 @@ interface ViewModel {
   totalNodes: number
   currentPhaseLabel: string
   currentPhaseNumber: number
+  /** Sum of xp_earned on completed topics — backend is the source of truth. */
+  totalXP: number
 }
 
 function buildViewModel(state: BackendRoadmapState): ViewModel {
@@ -63,6 +65,11 @@ function buildViewModel(state: BackendRoadmapState): ViewModel {
   const allNodes = phases.flatMap((p) => p.nodes)
   const activePhase = phases.find((p) => p.nodes.some((n) => n.status === "active"))
 
+  // Compute totalXP from backend xp_earned — identical to WelcomeHeader's calculation
+  const totalXP = state.phases
+    .flatMap((p) => p.topics)
+    .reduce((sum, t) => sum + (t.status === "completed" ? t.xp_earned : 0), 0)
+
   return {
     skill: state.skill,
     phases,
@@ -70,6 +77,7 @@ function buildViewModel(state: BackendRoadmapState): ViewModel {
     totalNodes: state.total_count,
     currentPhaseLabel: activePhase?.phaseTitle || phases[0]?.phaseTitle || "Phase 1",
     currentPhaseNumber: activePhase?.phaseNumber || 1,
+    totalXP,
   }
 }
 
@@ -229,6 +237,7 @@ export default function RoadmapPage() {
                 totalNodes={roadmap.totalNodes}
                 currentPhaseLabel={roadmap.currentPhaseLabel}
                 currentPhaseNumber={roadmap.currentPhaseNumber}
+                totalXP={roadmap.totalXP}
               />
             </div>
 

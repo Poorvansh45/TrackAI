@@ -19,11 +19,17 @@ export function AIAssistantPanel({ phases, skill }: AIAssistantPanelProps) {
   // Next 3 locked topics as "upcoming"
   const nextTopics   = lockedNodes.slice(0, 3).map(n => n.name)
 
-  // Weak concepts — derive from lower-xp completed nodes (simulate weaknesses)
+  // Weak concepts — derive stability from xp_earned vs expected XP
+  // Stable derivation: no Math.random() which causes inconsistent re-renders
   const weakConcepts = allNodes
     .filter(n => n.status === "completed" && n.xp <= 130)
     .slice(0, 3)
-    .map(n => ({ name: n.name, accuracy: Math.floor(Math.random() * 25) + 55 }))
+    .map(n => {
+      // Approximate accuracy from XP earned relative to max possible (200 for early topics)
+      const maxXp = 200
+      const accuracy = Math.min(95, Math.max(40, Math.round((n.xp / maxXp) * 100)))
+      return { name: n.name, accuracy }
+    })
 
   // Upcoming quiz topic
   const quizTopic = activeNode?.name || nextTopics[0] || "Foundations"
@@ -158,7 +164,32 @@ export function AIAssistantPanel({ phases, skill }: AIAssistantPanelProps) {
           <Sparkles className="w-3 h-3 text-accent" />
           <p className="text-mono text-[9px] text-accent uppercase font-semibold">AI Mentor Insight</p>
         </div>
-        <p className="text-[11px] text-foreground-muted leading-relaxed">{insight}</p>
+        <div className="space-y-1.5">
+          {activeNode && (
+            <div>
+              <p className="text-mono text-[8px] text-foreground-subtle uppercase mb-0.5">Current Focus</p>
+              <p className="text-[11px] text-foreground font-medium">{activeNode.name}</p>
+            </div>
+          )}
+          {nextTopics.length > 0 && (
+            <div>
+              <p className="text-mono text-[8px] text-foreground-subtle uppercase mb-0.5">Next Steps</p>
+              <p className="text-[11px] text-foreground-muted">
+                {nextTopics.slice(0, 2).join(" → ")}
+              </p>
+            </div>
+          )}
+          <div>
+            <p className="text-mono text-[8px] text-foreground-subtle uppercase mb-0.5">Mentor Tip</p>
+            <p className="text-[11px] text-foreground-muted leading-relaxed">
+              {activeNode
+                ? `Completing "${activeNode.name}" unlocks ${nextTopics.length} new concept${nextTopics.length !== 1 ? "s" : ""}. Focus on practical exercises today.`
+                : completedCnt > 0
+                ? `You've completed ${completedCnt} topic${completedCnt > 1 ? "s" : ""}. Consistent daily sessions outperform long irregular ones.`
+                : `Start with the first topic to build a strong foundation.`}
+            </p>
+          </div>
+        </div>
       </div>
     </motion.div>
   )

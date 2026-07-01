@@ -140,15 +140,33 @@ export function RoadmapNode({ node, index, isLast, justUnlocked = false }: Roadm
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-2">
-              <h3 className={`text-[13px] font-semibold leading-tight ${
-                isLocked && !justUnlocked
-                  ? "text-foreground-subtle"
-                  : isCompleted
-                  ? "text-foreground-muted"
-                  : "text-foreground"
-              }`}>
-                {node.name}
-              </h3>
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                <h3 className={`text-[13px] font-semibold leading-tight ${
+                  isLocked && !justUnlocked
+                    ? "text-foreground-subtle"
+                    : isCompleted
+                    ? "text-foreground-muted"
+                    : "text-foreground"
+                }`}>
+                  {node.name}
+                </h3>
+                {/* Status chip */}
+                {isCompleted && (
+                  <span className="flex-shrink-0 text-mono text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-success/10 border border-success/25 text-success">
+                    MASTERED
+                  </span>
+                )}
+                {isActive && (
+                  <span className="flex-shrink-0 text-mono text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent">
+                    IN PROGRESS
+                  </span>
+                )}
+                {isLocked && !justUnlocked && (
+                  <span className="flex-shrink-0 text-mono text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 border border-border/30 text-foreground-subtle/50">
+                    LOCKED
+                  </span>
+                )}
+              </div>
               {!isLocked && (
                 <span className="xp-badge text-mono text-[9px] font-bold text-accent px-2 py-0.5 rounded-full flex-shrink-0 flex items-center gap-1">
                   <Zap className="w-2.5 h-2.5" />+{node.xp}

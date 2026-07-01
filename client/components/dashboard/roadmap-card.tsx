@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { CheckCircle2, Lock, ChevronRight, Play } from "lucide-react"
+import { CheckCircle2, Lock, ChevronRight, Play, Circle } from "lucide-react"
 import Link from "next/link"
-import { useRoadmapProgress } from "@/lib/roadmap-state"
+import { useRoadmapProgress, type BackendPhase } from "@/lib/roadmap-state"
 
 interface Node {
   id: string
@@ -13,24 +13,35 @@ interface Node {
   status: "completed" | "current" | "locked"
   xp: number
   progress?: number
+  completedSubtopics: number
+  totalSubtopics: number
 }
 
 export function RoadmapCard() {
   const router = useRouter()
   const { data, loading } = useRoadmapProgress()
 
-  const skillLabel = data?.skill ? `${data.skill} Track` : "Loading Track..."
-
-  // Build a flat, ordered node list directly from backend roadmap_progress —
-  // this is the SAME data the Learning Graph and Dashboard both read, so
-  // status (completed/current/locked) and progress are always identical.
-  const nodes: Node[] = []
+  // ── Resolve the active phase ─────────────────────────────────────────────
+  let activePhase: BackendPhase | null = null
   if (data) {
-    const flat = data.phases
-      .flatMap((p) => p.topics)
-      .sort((a, b) => a.order - b.order)
+    activePhase =
+      data.phases.find((p) => p.topics.some((t) => t.status === "active")) ??
+      data.phases[data.phases.length - 1] ??
+      null
+  }
 
-    for (const topic of flat.slice(0, 5)) {
+  const skillLabel = data?.skill
+    ? activePhase
+      ? `${data.skill} · ${activePhase.phase_title}`
+      : `${data.skill} Track`
+    : "Loading Track..."
+
+  // ── Build node list from the active phase only ───────────────────────────
+  const nodes: Node[] = []
+  if (activePhase) {
+    const phaseTopics = [...activePhase.topics].sort((a, b) => a.order - b.order)
+
+    for (const topic of phaseTopics.slice(0, 5)) {
       nodes.push({
         id: `RD-${String(topic.order + 1).padStart(3, "0")}`,
         name: topic.topic_name,
@@ -44,6 +55,8 @@ export function RoadmapCard() {
           topic.status === "completed" ? 100 :
           topic.status === "active"    ? topic.progress_pct :
           undefined,
+        completedSubtopics: topic.completed_subtopics.length,
+        totalSubtopics: topic.total_subtopics || 5,
       })
     }
   }
@@ -71,18 +84,21 @@ export function RoadmapCard() {
       <div className="relative">
         <div className="absolute left-3.5 top-2.5 bottom-2.5 w-[1px] bg-border/60" />
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {nodes.map((node) => {
             const isCurrent = node.status === "current"
             const isCompleted = node.status === "completed"
+            const isLocked = node.status === "locked"
 
             return (
               <div
                 key={node.id}
-                className={`relative flex items-center gap-3.5 pl-8 pr-3 py-2 rounded-lg transition-all ${
+                className={`relative flex items-center gap-3.5 pl-8 pr-3 py-2.5 rounded-lg transition-all ${
                   isCurrent
                     ? "bg-surface-2/60 border border-accent/20"
-                    : "bg-transparent border border-transparent"
+                    : isCompleted
+                    ? "bg-transparent border border-transparent"
+                    : "bg-transparent border border-transparent opacity-60"
                 }`}
               >
                 {/* Node icon */}
@@ -97,11 +113,9 @@ export function RoadmapCard() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
+                  {/* Name row + status chip + XP */}
+                  <div className="flex items-center justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-mono text-[9px] text-foreground-subtle flex-shrink-0">
-                        {node.id}
-                      </span>
                       <h4
                         className={`text-[12px] font-semibold truncate ${
                           isCompleted
@@ -113,11 +127,26 @@ export function RoadmapCard() {
                       >
                         {node.name}
                       </h4>
+
+                      {/* Status chip */}
+                      {isCompleted && (
+                        <span className="flex-shrink-0 text-mono text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-success/10 border border-success/25 text-success">
+                          Mastered
+                        </span>
+                      )}
+                      {isCurrent && (
+                        <span className="flex-shrink-0 text-mono text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent">
+                          Active
+                        </span>
+                      )}
                     </div>
+
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-mono text-[9px] text-foreground-subtle">
-                        +{node.xp} XP
-                      </span>
+                      {!isLocked && (
+                        <span className="text-mono text-[9px] text-foreground-subtle">
+                          +{node.xp} XP
+                        </span>
+                      )}
                       {isCurrent && node.slug && (
                         <button
                           onClick={() => router.push(`/topic/${node.slug}`)}
@@ -130,28 +159,44 @@ export function RoadmapCard() {
                     </div>
                   </div>
 
-                  {(isCurrent || isCompleted) && node.progress !== undefined && (
-                    <div className="mt-2 max-w-xs">
-                      <div className="flex justify-between text-mono text-[9px] mb-1">
-                        <span className="text-foreground-subtle">
-                          {isCompleted ? "Mastered" : "In progress"}
-                        </span>
-                        <span className="text-accent font-semibold">{node.progress}%</span>
-                      </div>
-                      <div className="h-0.5 bg-surface-3 rounded-full overflow-hidden">
-                        <motion.div
-                          className="h-full"
-                          initial={{ width: 0 }}
-                          animate={{ width: `${node.progress}%` }}
-                          transition={{ duration: 0.6, ease: "easeOut" }}
-                          style={{
-                            background: isCompleted
-                              ? "oklch(0.60 0.16 155)"
-                              : "oklch(0.62 0.20 275)",
-                          }}
-                        />
-                      </div>
+                  {/* Concept count + progress bar */}
+                  {!isLocked && (
+                    <div className="flex items-center gap-3">
+                      {/* Concepts count pill */}
+                      <span className="text-mono text-[9px] text-foreground-subtle flex-shrink-0">
+                        {isCompleted ? (
+                          <span className="text-success font-medium">
+                            {node.totalSubtopics} / {node.totalSubtopics} Concepts
+                          </span>
+                        ) : (
+                          `${node.completedSubtopics} / ${node.totalSubtopics} Concepts`
+                        )}
+                      </span>
+
+                      {/* Progress bar */}
+                      {node.progress !== undefined && (
+                        <div className="flex-1 h-0.5 bg-surface-3 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${node.progress}%` }}
+                            transition={{ duration: 0.6, ease: "easeOut" }}
+                            style={{
+                              background: isCompleted
+                                ? "oklch(0.60 0.16 155)"
+                                : "oklch(0.62 0.20 275)",
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
+                  )}
+
+                  {/* Locked label */}
+                  {isLocked && (
+                    <span className="text-mono text-[9px] text-foreground-subtle/50">
+                      Complete active topic to unlock
+                    </span>
                   )}
                 </div>
               </div>
