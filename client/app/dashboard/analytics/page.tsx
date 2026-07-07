@@ -22,6 +22,11 @@ import {
   derivePhaseTimeline, 
   deriveInsights 
 } from "@/lib/analytics-engine"
+// ── Phase 3 imports ────────────────────────────────────────────────────────
+import { deriveDailyProgress } from "@/lib/daily-progress"
+import { deriveCoachRecommendation, deriveGuardianStatus } from "@/lib/phase3-engine"
+import { AILearningCoach } from "@/components/analytics/ai-learning-coach"
+import { StreakGoalGuardian } from "@/components/analytics/streak-goal-guardian"
 
 export default function AnalyticsPage() {
   const { data, loading } = useRoadmapProgress()
@@ -33,6 +38,10 @@ export default function AnalyticsPage() {
   const xpHistory = useMemo(() => deriveXPTimeline(data), [data])
   const phaseTimeline = useMemo(() => derivePhaseTimeline(data), [data])
   const insights = useMemo(() => deriveInsights(data, streak, velocity, forecast), [data, streak, velocity, forecast])
+  // ── Phase 3 derivations — pure memos, zero extra API calls ──────────────
+  const daily    = useMemo(() => (data ? deriveDailyProgress(data) : null), [data])
+  const coach    = useMemo(() => deriveCoachRecommendation(data, quizData, streak, velocity, forecast), [data, quizData, streak, velocity, forecast])
+  const guardian = useMemo(() => deriveGuardianStatus(data, streak, daily), [data, streak, daily])
 
   if (loading || quizLoading) {
     return (
@@ -72,6 +81,19 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="space-y-6">
+        {/* ── Phase 3: Action Layer ─────────────────────────────────────── */}
+        <div className="grid lg:grid-cols-3 gap-6 items-start">
+          {/* AI Learning Coach — main column (2/3) */}
+          <div className="lg:col-span-2">
+            <AILearningCoach recommendation={coach} />
+          </div>
+          {/* Streak Goal Guardian — sidebar column (1/3) */}
+          <div>
+            <StreakGoalGuardian status={guardian} />
+          </div>
+        </div>
+
+        {/* ── Phase 1 + 2: Analytics Layer (unchanged below) ─────────────── */}
         {/* KPI Row */}
         <OverviewCards data={data} />
 
