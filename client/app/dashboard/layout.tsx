@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <DashboardNav />
       <div className="flex">
         <DashboardSidebar />
-        <main className={`flex-1 pt-16 lg:pl-14 ${isRoadmapPage ? "pb-0 px-0" : "pb-5 px-5 lg:pb-8 lg:px-8"}`}>
+        <main className={`flex-1 pt-16 lg:pl-14 ${isRoadmapPage ? "pb-0 pl-0 pr-0 lg:pl-14 lg:pr-0" : "pb-5 px-5 lg:pb-8 lg:px-8"}`}>
           {children}
         </main>
       </div>

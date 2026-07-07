@@ -203,47 +203,31 @@
   border-radius: 12px;
 }
 
-@keyframes glow-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 8px oklch(0.62 0.20 275 / 0.5),
-      0 0 20px oklch(0.62 0.20 275 / 0.25),
-      0 0 40px oklch(0.62 0.20 275 / 0.10),
-      inset 0 0 12px oklch(0.62 0.20 275 / 0.08);
-  }
-  50% {
-    box-shadow:
-      0 0 14px oklch(0.62 0.20 275 / 0.75),
-      0 0 32px oklch(0.62 0.20 275 / 0.40),
-      0 0 60px oklch(0.62 0.20 275 / 0.20),
-      inset 0 0 20px oklch(0.62 0.20 275 / 0.14);
-  }
-}
+/* Active and success states - clean borders and subtle static depth */
 .glow-active {
-  animation: glow-pulse 2.4s ease-in-out infinite;
-  border-color: oklch(0.62 0.20 275 / 0.8) !important;
+  border-color: oklch(0.62 0.20 275 / 0.95) !important;
+  box-shadow: 0 0 12px oklch(0.62 0.20 275 / 0.08);
 }
 .glow-success {
-  box-shadow: 0 0 8px oklch(0.60 0.16 155 / 0.4), 0 0 20px oklch(0.60 0.16 155 / 0.15);
-  border-color: oklch(0.60 0.16 155 / 0.6) !important;
+  border-color: oklch(0.60 0.16 155 / 0.8) !important;
+  box-shadow: 0 0 8px oklch(0.60 0.16 155 / 0.05);
 }
 
-.node-connector      { width: 2px; background: linear-gradient(to bottom, oklch(0.62 0.20 275 / 0.6), oklch(0.25 0.04 275 / 0.3)); border-radius: 1px; }
-.node-connector-done { background: linear-gradient(to bottom, oklch(0.60 0.16 155 / 0.8), oklch(0.60 0.16 155 / 0.2)); }
+.node-connector      { width: 1.5px; background: linear-gradient(to bottom, oklch(0.62 0.20 275 / 0.4), oklch(0.25 0.04 275 / 0.15)); border-radius: 1px; }
+.node-connector-done { background: linear-gradient(to bottom, oklch(0.60 0.16 155 / 0.5), oklch(0.60 0.16 155 / 0.1)); }
 
 @keyframes orb-float {
-  0%, 100% { transform: translateY(0px) scale(1); opacity: 0.5; }
-  50%       { transform: translateY(-14px) scale(1.05); opacity: 0.75; }
+  0%, 100% { transform: translateY(0px) scale(1); opacity: 0.12; }
+  50%       { transform: translateY(-8px) scale(1.02); opacity: 0.2; }
 }
-.orb-glow { animation: orb-float 7s ease-in-out infinite; border-radius: 9999px; filter: blur(90px); pointer-events: none; }
+.orb-glow { animation: orb-float 25s ease-in-out infinite; border-radius: 9999px; filter: blur(100px); pointer-events: none; }
 
 .scanlines {
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, oklch(0.62 0.20 275 / 0.012) 2px, oklch(0.62 0.20 275 / 0.012) 4px);
-  pointer-events: none;
+  display: none;
 }
 .metric-card {
   background: oklch(0.10 0.01 260 / 0.6);
-  border: 1px solid oklch(0.20 0.02 275 / 0.35);
+  border: 1px solid oklch(0.20 0.02 275 / 0.2);
   border-radius: 8px;
   backdrop-filter: blur(8px);
 }
@@ -252,22 +236,18 @@
 
 .phase-glow-line {
   height: 1px;
-  background: linear-gradient(to right, transparent, oklch(0.62 0.20 275 / 0.6), oklch(0.62 0.20 275 / 0.2), transparent);
+  background: linear-gradient(to right, transparent, oklch(0.62 0.20 275 / 0.35), oklch(0.62 0.20 275 / 0.1), transparent);
 }
 
-@keyframes xp-shimmer {
-  0%   { background-position: -200% center; }
-  100% { background-position:  200% center; }
-}
 .xp-badge {
-  background: linear-gradient(90deg, oklch(0.62 0.20 275 / 0.25) 0%, oklch(0.70 0.22 280 / 0.50) 50%, oklch(0.62 0.20 275 / 0.25) 100%);
-  background-size: 200% auto;
-  animation: xp-shimmer 3s linear infinite;
+  background: oklch(0.62 0.20 275 / 0.08);
+  border: 1px solid oklch(0.62 0.20 275 / 0.2);
+  color: oklch(0.62 0.20 275);
 }
 
-.badge-beginner     { background: oklch(0.60 0.16 155 / 0.18); color: oklch(0.72 0.18 155); border: 1px solid oklch(0.60 0.16 155 / 0.30); }
-.badge-intermediate { background: oklch(0.70 0.15 75  / 0.18); color: oklch(0.75 0.17 75 ); border: 1px solid oklch(0.70 0.15 75  / 0.30); }
-.badge-advanced     { background: oklch(0.55 0.20 25  / 0.18); color: oklch(0.68 0.20 25 ); border: 1px solid oklch(0.55 0.20 25  / 0.30); }
+.badge-beginner     { background: oklch(0.13 0.01 260); color: oklch(0.72 0.18 155); border: 1px solid oklch(0.60 0.16 155 / 0.25); }
+.badge-intermediate { background: oklch(0.13 0.01 260); color: oklch(0.75 0.17 75); border: 1px solid oklch(0.70 0.15 75 / 0.25); }
+.badge-advanced     { background: oklch(0.13 0.01 260); color: oklch(0.68 0.20 25); border: 1px solid oklch(0.55 0.20 25 / 0.25); }
 
 .ai-item {
   background: oklch(0.11 0.01 260 / 0.8);
@@ -279,3 +259,14 @@
   border-color: oklch(0.62 0.20 275 / 0.45);
   background: oklch(0.13 0.01 260 / 0.95);
 }
+
+/* Sidebar hover-expansion content offset push */
+@media (min-width: 1024px) {
+  main {
+    transition: padding-left 200ms ease-in-out;
+  }
+  aside:hover ~ main {
+    padding-left: 12rem !important;
+  }
+}
+

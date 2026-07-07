@@ -1,7 +1,8 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { Cpu, CheckCircle2, Zap, ChevronRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Cpu, CheckCircle2, Zap, ChevronRight, ChevronDown } from "lucide-react"
 import { RoadmapNode, type RoadmapNodeData } from "./roadmap-node"
 
 export interface PhaseData {
@@ -21,6 +22,26 @@ function toSlug(name: string) {
 }
 
 export function LearningGraph({ phases, skill, justUnlockedSlugs }: LearningGraphProps) {
+  const [expandedPhases, setExpandedPhases] = useState<Record<number, boolean>>({})
+  const [hasInitialized, setHasInitialized] = useState(false)
+
+  // Automatically expand the active phase on initial load
+  useEffect(() => {
+    if (phases.length > 0 && !hasInitialized) {
+      const activePhase = phases.find(p => p.nodes.some(n => n.status === "active"))
+      const activeNum = activePhase?.phaseNumber ?? 1
+      setExpandedPhases({ [activeNum]: true })
+      setHasInitialized(true)
+    }
+  }, [phases, hasInitialized])
+
+  const togglePhase = (phaseNumber: number) => {
+    setExpandedPhases(prev => ({
+      ...prev,
+      [phaseNumber]: !prev[phaseNumber]
+    }))
+  }
+
   if (phases.length === 0) {
     return (
       <div className="glass-panel flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
@@ -46,23 +67,22 @@ export function LearningGraph({ phases, skill, justUnlockedSlugs }: LearningGrap
 
         const phaseCompleted = allNodesInPhase.every(n => n.status === "completed")
         const phaseActive    = allNodesInPhase.some(n => n.status === "active")
+        const isExpanded     = !!expandedPhases[phase.phaseNumber]
 
         return (
           <motion.div
             key={phase.phaseNumber}
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: pIdx * 0.1, ease: "easeOut" }}
+            transition={{ duration: 0.3, delay: pIdx * 0.05, ease: "easeOut" }}
           >
-            {/* Phase header */}
-            <div className="flex items-center gap-3 mb-5">
-              <motion.div
+            {/* Phase header (Click to expand/collapse) */}
+            <div 
+              onClick={() => togglePhase(phase.phaseNumber)}
+              className="flex items-center gap-3 mb-5 cursor-pointer group/header select-none hover:opacity-90 transition-opacity"
+            >
+              <div
                 className="flex-shrink-0 w-8 h-8 rounded-lg border flex items-center justify-center"
-                animate={phaseCompleted ? {
-                  borderColor: ["oklch(0.60 0.16 155 / 0.3)", "oklch(0.60 0.16 155 / 0.6)", "oklch(0.60 0.16 155 / 0.3)"],
-                  boxShadow: ["0 0 0px transparent", "0 0 12px oklch(0.60 0.16 155 / 0.2)", "0 0 0px transparent"],
-                } : {}}
-                transition={{ duration: 2, repeat: phaseCompleted ? Infinity : 0, ease: "easeInOut" }}
                 style={{
                   background: phaseCompleted
                     ? "oklch(0.60 0.16 155 / 0.12)"
@@ -78,7 +98,7 @@ export function LearningGraph({ phases, skill, justUnlockedSlugs }: LearningGrap
                 >
                   {phase.phaseNumber}
                 </span>
-              </motion.div>
+              </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
@@ -86,93 +106,100 @@ export function LearningGraph({ phases, skill, justUnlockedSlugs }: LearningGrap
                     Phase {phase.phaseNumber}
                   </span>
                 </div>
-                <h2 className="text-[14px] font-semibold text-foreground leading-tight truncate">
+                <h2 className="text-[14px] font-semibold text-foreground leading-tight truncate group-hover/header:text-accent transition-colors">
                   {phase.phaseTitle}
                 </h2>
               </div>
 
-              {/* Phase completion badge */}
-              <div className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2/60 border border-border/40">
-                <div className={`w-1.5 h-1.5 rounded-full ${
-                  phaseCompleted
-                    ? "bg-success"
-                    : phaseActive
-                    ? "bg-accent animate-pulse"
-                    : "bg-foreground-subtle/30"
+              {/* Phase completion badge + Toggle Chevron */}
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-2/60 border border-border/40">
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    phaseCompleted
+                      ? "bg-success"
+                      : phaseActive
+                      ? "bg-accent"
+                      : "bg-foreground-subtle/30"
+                  }`} />
+                  <span className="text-mono text-[9px] text-foreground-subtle">
+                    {allNodesInPhase.filter(n => n.status === "completed").length}/{allNodesInPhase.length}
+                  </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-foreground-subtle/70 group-hover/header:text-foreground transition-transform duration-200 ${
+                  isExpanded ? "rotate-0" : "-rotate-90"
                 }`} />
-                <span className="text-mono text-[9px] text-foreground-subtle">
-                  {allNodesInPhase.filter(n => n.status === "completed").length}/{allNodesInPhase.length}
-                </span>
               </div>
             </div>
 
-            {/* Phase underline — animates green when phase complete */}
-            <motion.div
-              className="phase-glow-line mb-5"
-              animate={phaseCompleted ? {
-                background: [
-                  "linear-gradient(to right, transparent, oklch(0.60 0.16 155 / 0.5), transparent)",
-                  "linear-gradient(to right, transparent, oklch(0.60 0.16 155 / 0.8), transparent)",
-                  "linear-gradient(to right, transparent, oklch(0.60 0.16 155 / 0.5), transparent)",
-                ],
-              } : {}}
-              transition={{ duration: 2.5, repeat: phaseCompleted ? Infinity : 0 }}
-            />
+            {/* Clean Static Phase Divider */}
+            <div className="phase-glow-line mb-5" />
 
-            {/* Nodes */}
-            <div className="flex flex-col items-stretch space-y-0">
-              {allNodesInPhase.map((node, nIdx) => {
-                const slug = toSlug(node.name)
-                const justUnlocked = justUnlockedSlugs?.has(slug) ?? false
-
-                return (
-                  <RoadmapNode
-                    key={node.id}
-                    node={node}
-                    index={phaseStartIndex + nIdx}
-                    isLast={nIdx === allNodesInPhase.length - 1}
-                    justUnlocked={justUnlocked}
-                  />
-                )
-              })}
-            </div>
-
-            {/* Phase completion banner */}
-            <AnimatePresence>
-              {phaseCompleted && (
+            {/* Collapsible nodes */}
+            <AnimatePresence initial={false}>
+              {isExpanded && (
                 <motion.div
-                  key={`phase-${phase.phaseNumber}-complete`}
-                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  className="mt-3 rounded-lg border border-success/25 bg-success/8 px-4 py-3"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: "easeInOut" }}
+                  className="overflow-hidden"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-success" />
-                      <div>
-                        <p className="text-[12px] font-semibold text-success">
-                          Phase {phase.phaseNumber} Complete
-                        </p>
-                        <p className="text-mono text-[9px] text-foreground-subtle mt-0.5">
-                          {allNodesInPhase.length} topics mastered
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1 text-mono text-[10px] text-success font-semibold">
-                        <Zap className="w-3 h-3" />
-                        +{allNodesInPhase.reduce((sum, n) => sum + (n.xp || 0), 0)} XP
-                      </div>
-                      {pIdx < phases.length - 1 && (
-                        <div className="flex items-center gap-1 text-mono text-[9px] text-foreground-subtle">
-                          <span>Phase {phase.phaseNumber + 1}</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </div>
-                      )}
-                    </div>
+                  <div className="flex flex-col items-stretch space-y-0 pb-3">
+                    {allNodesInPhase.map((node, nIdx) => {
+                      const slug = toSlug(node.name)
+                      const justUnlocked = justUnlockedSlugs?.has(slug) ?? false
+
+                      return (
+                        <RoadmapNode
+                          key={node.id}
+                          node={node}
+                          index={phaseStartIndex + nIdx}
+                          isLast={nIdx === allNodesInPhase.length - 1}
+                          justUnlocked={justUnlocked}
+                        />
+                      )
+                    })}
                   </div>
+
+                  {/* Phase completion banner */}
+                  <AnimatePresence>
+                    {phaseCompleted && (
+                      <motion.div
+                        key={`phase-${phase.phaseNumber}-complete`}
+                        initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="mt-3 rounded-lg border border-success/25 bg-success/8 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-success" />
+                            <div>
+                              <p className="text-[12px] font-semibold text-success">
+                                Phase {phase.phaseNumber} Complete
+                              </p>
+                              <p className="text-mono text-[9px] text-foreground-subtle mt-0.5">
+                                {allNodesInPhase.length} topics mastered
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1 text-mono text-[10px] text-success font-semibold">
+                              <Zap className="w-3 h-3" />
+                              +{allNodesInPhase.reduce((sum, n) => sum + (n.xp || 0), 0)} XP
+                            </div>
+                            {pIdx < phases.length - 1 && (
+                              <div className="flex items-center gap-1 text-mono text-[9px] text-foreground-subtle">
+                                <span>Phase {phase.phaseNumber + 1}</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -180,11 +207,8 @@ export function LearningGraph({ phases, skill, justUnlockedSlugs }: LearningGrap
             {/* Inter-phase connector */}
             {pIdx < phases.length - 1 && (
               <div className="flex flex-col items-center mt-4">
-                <motion.div
-                  className="node-connector h-10"
-                  animate={phaseCompleted ? { opacity: [0.5, 1, 0.5] } : {}}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  style={phaseCompleted ? { borderColor: "oklch(0.60 0.16 155 / 0.5)" } : {}}
+                <div
+                  className={`node-connector h-10 ${phaseCompleted ? "node-connector-done" : ""}`}
                 />
                 <div className="px-3 py-1 rounded-full bg-surface-2/60 border border-border/30 text-mono text-[8px] text-foreground-subtle uppercase">
                   Phase {phase.phaseNumber + 1} unlocks

@@ -53,3 +53,5 @@ graphify-out/
 venv_files.txt
 graphify-out/
 venv_files.txt
+
+*.tsbuildinfo
