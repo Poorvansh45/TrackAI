@@ -8,7 +8,8 @@ POST /api/v1/topic/explain               — AI re-explain (Gemini)
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.api.deps import get_current_user
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
@@ -153,17 +154,10 @@ async def get_topic(topic_id: str, skill: str = "Programming"):
 
 
 @router.post("/progress", response_model=ProgressResponse)
-async def save_progress(payload: ProgressRequest):
-    """
-    Persist checklist progress for a topic AND mirror the update into the
-    roadmap_progress collection (the single source of truth for the
-    Dashboard, Learning Graph, and Topic Workspace).
+async def save_progress(payload: ProgressRequest, current_user: dict = Depends(get_current_user)):
+    # Security: override user_id from JWT — never trust client-supplied user_id
+    user_id = str(current_user["_id"])
 
-    Root-cause fix for "11/5 = 220%": completed_subtopics is deduped via
-    set() and the count is capped at total_subtopics, so progress_pct can
-    never exceed 100.
-    """
-    user_id = payload.user_id or "anon"
 
     # Dedupe + cap — never let progress exceed 100%
     unique_completed = list(dict.fromkeys(payload.completed_subtopics))
@@ -195,11 +189,12 @@ async def save_progress(payload: ProgressRequest):
                 completed_subtopics=unique_completed,
                 total_subtopics=payload.total_subtopics,
             ),
+            current_user=current_user,
         )
 
         # If fully completed, mark complete + unlock next topic
         if payload.is_completed:
-            result = await complete_topic(payload.topic_id, CompleteRequest(user_id=user_id))
+            result = await complete_topic(payload.topic_id, CompleteRequest(user_id=user_id), current_user=current_user)
             next_unlocked = result.next_topic_id
 
     except HTTPException as exc:
@@ -219,9 +214,9 @@ async def save_progress(payload: ProgressRequest):
 
 
 @router.get("/{topic_id}/progress", response_model=TopicProgressState)
-async def get_progress(topic_id: str, user_id: Optional[str] = None):
+async def get_progress(topic_id: str, current_user: dict = Depends(get_current_user)):
     topic_id = topic_id.lower().strip()
-    uid = user_id or "anon"
+    uid = str(current_user["_id"])
     try:
         from app.core.database import get_database
         db = get_database()

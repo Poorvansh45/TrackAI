@@ -1,0 +1,426 @@
+{
+  "version": "1.0",
+  "description": "Tracks AI Mentor — Intent Classification Evaluation Dataset",
+  "total_cases": 50,
+  "intent_types": [
+    "explain_concept",
+    "generate_quiz",
+    "summarize_text",
+    "roadmap_help",
+    "pdf_question",
+    "youtube_question",
+    "weakness_diagnosis",
+    "revision_plan",
+    "general_chat"
+  ],
+  "cases": [
+    {
+      "id": "EC-001",
+      "input": "Explain recursion",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {"concept": "recursion"},
+      "tags": ["basics", "python"]
+    },
+    {
+      "id": "EC-002",
+      "input": "What is a linked list?",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {"concept": "linked list"},
+      "tags": ["data-structures"]
+    },
+    {
+      "id": "EC-003",
+      "input": "How does a neural network learn?",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {},
+      "tags": ["ml", "ai"]
+    },
+    {
+      "id": "EC-004",
+      "input": "Define polymorphism in OOP",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {"concept": "polymorphism"},
+      "tags": ["oop", "python"]
+    },
+    {
+      "id": "EC-005",
+      "input": "Teach me about Big O notation",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {},
+      "tags": ["algorithms"]
+    },
+    {
+      "id": "EC-006",
+      "input": "I don't understand gradient descent",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {},
+      "tags": ["ml"]
+    },
+    {
+      "id": "EC-007",
+      "input": "What is async/await in Python?",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {},
+      "tags": ["python", "async"]
+    },
+    {
+      "id": "EC-008",
+      "input": "How do decorators work?",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {},
+      "tags": ["python"]
+    },
+    {
+      "id": "GQ-001",
+      "input": "Quiz me on recursion",
+      "expected_intent": "generate_quiz",
+      "expected_tool": "QuizTool",
+      "expected_params_partial": {},
+      "tags": ["quiz", "basics"]
+    },
+    {
+      "id": "GQ-002",
+      "input": "Test me on Python data types",
+      "expected_intent": "generate_quiz",
+      "expected_tool": "QuizTool",
+      "expected_params_partial": {},
+      "tags": ["quiz", "python"]
+    },
+    {
+      "id": "GQ-003",
+      "input": "Give me 5 practice questions on machine learning",
+      "expected_intent": "generate_quiz",
+      "expected_tool": "QuizTool",
+      "expected_params_partial": {"num_questions": 5},
+      "tags": ["quiz", "ml"]
+    },
+    {
+      "id": "GQ-004",
+      "input": "Generate an advanced quiz on binary trees",
+      "expected_intent": "generate_quiz",
+      "expected_tool": "QuizTool",
+      "expected_params_partial": {"difficulty": "advanced"},
+      "tags": ["quiz", "data-structures"]
+    },
+    {
+      "id": "GQ-005",
+      "input": "Create MCQ questions about neural networks",
+      "expected_intent": "generate_quiz",
+      "expected_tool": "QuizTool",
+      "expected_params_partial": {},
+      "tags": ["quiz", "ml"]
+    },
+    {
+      "id": "ST-001",
+      "input": "Summarize this text: Machine learning is a method of data analysis that automates analytical model building.",
+      "expected_intent": "summarize_text",
+      "expected_tool": "SummarizeTextTool",
+      "expected_params_partial": {},
+      "tags": ["summarize"]
+    },
+    {
+      "id": "ST-002",
+      "input": "Give me a brief overview of the following: Deep learning uses multiple layers to progressively extract higher-level features from raw input.",
+      "expected_intent": "summarize_text",
+      "expected_tool": "SummarizeTextTool",
+      "expected_params_partial": {},
+      "tags": ["summarize"]
+    },
+    {
+      "id": "ST-003",
+      "input": "TL;DR: Gradient descent is an optimization algorithm for finding a local minimum of a differentiable function by repeatedly stepping in the direction of steepest descent.",
+      "expected_intent": "summarize_text",
+      "expected_tool": "SummarizeTextTool",
+      "expected_params_partial": {},
+      "tags": ["summarize"]
+    },
+    {
+      "id": "ST-004",
+      "input": "Can you condense this for me: Python is a high-level, general-purpose programming language designed for readability.",
+      "expected_intent": "summarize_text",
+      "expected_tool": "SummarizeTextTool",
+      "expected_params_partial": {},
+      "tags": ["summarize"]
+    },
+    {
+      "id": "RH-001",
+      "input": "What should I learn next?",
+      "expected_intent": "roadmap_help",
+      "expected_tool": "HelpFromRoadmapTool",
+      "expected_params_partial": {},
+      "tags": ["roadmap"]
+    },
+    {
+      "id": "RH-002",
+      "input": "Guide my roadmap",
+      "expected_intent": "roadmap_help",
+      "expected_tool": "HelpFromRoadmapTool",
+      "expected_params_partial": {},
+      "tags": ["roadmap"]
+    },
+    {
+      "id": "RH-003",
+      "input": "What comes after Python basics?",
+      "expected_intent": "roadmap_help",
+      "expected_tool": "HelpFromRoadmapTool",
+      "expected_params_partial": {},
+      "tags": ["roadmap"]
+    },
+    {
+      "id": "RH-004",
+      "input": "Show me my learning path",
+      "expected_intent": "roadmap_help",
+      "expected_tool": "HelpFromRoadmapTool",
+      "expected_params_partial": {},
+      "tags": ["roadmap"]
+    },
+    {
+      "id": "RH-005",
+      "input": "My progress?",
+      "expected_intent": "roadmap_help",
+      "expected_tool": "HelpFromRoadmapTool",
+      "expected_params_partial": {},
+      "tags": ["roadmap"]
+    },
+    {
+      "id": "PDF-001",
+      "input": "What does the PDF say about neural networks?",
+      "expected_intent": "pdf_question",
+      "expected_tool": "PDFLearningAgent",
+      "expected_params_partial": {},
+      "tags": ["pdf", "rag"]
+    },
+    {
+      "id": "PDF-002",
+      "input": "Summarize this document",
+      "expected_intent": "pdf_question",
+      "expected_tool": "PDFLearningAgent",
+      "expected_params_partial": {},
+      "tags": ["pdf"]
+    },
+    {
+      "id": "PDF-003",
+      "input": "Create notes from this PDF",
+      "expected_intent": "pdf_question",
+      "expected_tool": "PDFLearningAgent",
+      "expected_params_partial": {},
+      "tags": ["pdf", "notes"]
+    },
+    {
+      "id": "PDF-004",
+      "input": "What does the document say on page 5?",
+      "expected_intent": "pdf_question",
+      "expected_tool": "PDFLearningAgent",
+      "expected_params_partial": {},
+      "tags": ["pdf"]
+    },
+    {
+      "id": "PDF-005",
+      "input": "Generate revision notes from this textbook",
+      "expected_intent": "pdf_question",
+      "expected_tool": "PDFLearningAgent",
+      "expected_params_partial": {},
+      "tags": ["pdf", "notes"]
+    },
+    {
+      "id": "YT-001",
+      "input": "https://www.youtube.com/watch?v=aircAruvnKk",
+      "expected_intent": "youtube_question",
+      "expected_tool": "YouTubeAgent",
+      "expected_params_partial": {},
+      "tags": ["youtube", "url"]
+    },
+    {
+      "id": "YT-002",
+      "input": "https://youtu.be/aircAruvnKk",
+      "expected_intent": "youtube_question",
+      "expected_tool": "YouTubeAgent",
+      "expected_params_partial": {},
+      "tags": ["youtube", "url"]
+    },
+    {
+      "id": "YT-003",
+      "input": "Summarize this YouTube video for me",
+      "expected_intent": "youtube_question",
+      "expected_tool": "YouTubeAgent",
+      "expected_params_partial": {},
+      "tags": ["youtube"]
+    },
+    {
+      "id": "YT-004",
+      "input": "What does the video say about gradient descent?",
+      "expected_intent": "youtube_question",
+      "expected_tool": "YouTubeAgent",
+      "expected_params_partial": {},
+      "tags": ["youtube"]
+    },
+    {
+      "id": "YT-005",
+      "input": "Ask me questions based on this youtube tutorial",
+      "expected_intent": "youtube_question",
+      "expected_tool": "YouTubeAgent",
+      "expected_params_partial": {},
+      "tags": ["youtube", "quiz"]
+    },
+    {
+      "id": "WD-001",
+      "input": "Analyze my progress",
+      "expected_intent": "weakness_diagnosis",
+      "expected_tool": "WeaknessAnalyzerAgent",
+      "expected_params_partial": {},
+      "tags": ["diagnosis"]
+    },
+    {
+      "id": "WD-002",
+      "input": "Where am I stuck?",
+      "expected_intent": "weakness_diagnosis",
+      "expected_tool": "WeaknessAnalyzerAgent",
+      "expected_params_partial": {},
+      "tags": ["diagnosis"]
+    },
+    {
+      "id": "WD-003",
+      "input": "What am I struggling with?",
+      "expected_intent": "weakness_diagnosis",
+      "expected_tool": "WeaknessAnalyzerAgent",
+      "expected_params_partial": {},
+      "tags": ["diagnosis"]
+    },
+    {
+      "id": "WD-004",
+      "input": "Do a weakness analysis on my learning",
+      "expected_intent": "weakness_diagnosis",
+      "expected_tool": "WeaknessAnalyzerAgent",
+      "expected_params_partial": {},
+      "tags": ["diagnosis"]
+    },
+    {
+      "id": "RP-001",
+      "input": "What should I study today?",
+      "expected_intent": "revision_plan",
+      "expected_tool": "RevisionPlannerAgent",
+      "expected_params_partial": {},
+      "tags": ["revision"]
+    },
+    {
+      "id": "RP-002",
+      "input": "Give me a revision plan",
+      "expected_intent": "revision_plan",
+      "expected_tool": "RevisionPlannerAgent",
+      "expected_params_partial": {},
+      "tags": ["revision"]
+    },
+    {
+      "id": "RP-003",
+      "input": "Plan my study day",
+      "expected_intent": "revision_plan",
+      "expected_tool": "RevisionPlannerAgent",
+      "expected_params_partial": {},
+      "tags": ["revision"]
+    },
+    {
+      "id": "RP-004",
+      "input": "What should I study today to improve?",
+      "expected_intent": "revision_plan",
+      "expected_tool": "RevisionPlannerAgent",
+      "expected_params_partial": {},
+      "tags": ["revision"]
+    },
+    {
+      "id": "RP-005",
+      "input": "Give me a daily plan for my learning",
+      "expected_intent": "revision_plan",
+      "expected_tool": "RevisionPlannerAgent",
+      "expected_params_partial": {},
+      "tags": ["revision"]
+    },
+    {
+      "id": "GC-001",
+      "input": "Hello!",
+      "expected_intent": "general_chat",
+      "expected_tool": null,
+      "expected_params_partial": {},
+      "tags": ["greeting"]
+    },
+    {
+      "id": "GC-002",
+      "input": "Hi there, how are you?",
+      "expected_intent": "general_chat",
+      "expected_tool": null,
+      "expected_params_partial": {},
+      "tags": ["greeting"]
+    },
+    {
+      "id": "GC-003",
+      "input": "Thanks!",
+      "expected_intent": "general_chat",
+      "expected_tool": null,
+      "expected_params_partial": {},
+      "tags": ["misc"]
+    },
+    {
+      "id": "GC-004",
+      "input": "Can you help me?",
+      "expected_intent": "general_chat",
+      "expected_tool": null,
+      "expected_params_partial": {},
+      "tags": ["misc"]
+    },
+    {
+      "id": "EC-009",
+      "input": "Explain this subtopic: Binary Search Trees",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {"concept": "Binary Search Trees"},
+      "tags": ["roadmap-card", "data-structures"]
+    },
+    {
+      "id": "EC-010",
+      "input": "Explain my current topic",
+      "expected_intent": "explain_concept",
+      "expected_tool": "ExplainConceptTool",
+      "expected_params_partial": {},
+      "tags": ["roadmap-card"]
+    },
+    {
+      "id": "GQ-006",
+      "input": "Test my knowledge on sorting algorithms",
+      "expected_intent": "generate_quiz",
+      "expected_tool": "QuizTool",
+      "expected_params_partial": {},
+      "tags": ["quiz", "algorithms"]
+    },
+    {
+      "id": "RH-006",
+      "input": "What's next in my curriculum?",
+      "expected_intent": "roadmap_help",
+      "expected_tool": "HelpFromRoadmapTool",
+      "expected_params_partial": {},
+      "tags": ["roadmap"]
+    },
+    {
+      "id": "YT-006",
+      "input": "From this video, what are the main concepts covered?",
+      "expected_intent": "youtube_question",
+      "expected_tool": "YouTubeAgent",
+      "expected_params_partial": {},
+      "tags": ["youtube"]
+    },
+    {
+      "id": "WD-005",
+      "input": "What topics am I struggling with based on my quiz results?",
+      "expected_intent": "weakness_diagnosis",
+      "expected_tool": "WeaknessAnalyzerAgent",
+      "expected_params_partial": {},
+      "tags": ["diagnosis"]
+    }
+  ]
+}

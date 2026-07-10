@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { motion } from "framer-motion"
 import { Flame, Zap } from "lucide-react"
 import { useRoadmapProgress } from "@/lib/roadmap-state"
+import { deriveStreak } from "@/lib/analytics-engine"
 
 interface WelcomeHeaderProps {
   hideStreak?: boolean
@@ -12,6 +13,8 @@ interface WelcomeHeaderProps {
 export function WelcomeHeader({ hideStreak = false }: WelcomeHeaderProps) {
   const [userName, setUserName] = useState("Learner")
   const { data } = useRoadmapProgress()
+
+  const streak = useMemo(() => deriveStreak(data), [data])
 
   // Total XP = sum of xp_earned across all completed topics, from the
   // backend roadmap_progress collection (single source of truth).
@@ -66,7 +69,9 @@ export function WelcomeHeader({ hideStreak = false }: WelcomeHeaderProps) {
         {!hideStreak && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-surface-1 border border-border">
             <Flame className="w-3.5 h-3.5 text-warning" />
-            <span className="text-mono text-[11px] font-bold text-foreground">7D STREAK</span>
+            <span className="text-mono text-[11px] font-bold text-foreground">
+              {streak.currentStreak}D STREAK
+            </span>
           </div>
         )}
         <motion.div

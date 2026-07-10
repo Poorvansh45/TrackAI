@@ -49,7 +49,8 @@ import re
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.api.deps import get_current_user
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("uvicorn.error")
@@ -201,7 +202,12 @@ async def _get_collection():
 # ─── Endpoints ──────────────────────────────────────────────────────────────
 
 @router.post("/init", response_model=RoadmapProgressState)
-async def init_roadmap(payload: InitRequest):
+async def init_roadmap(payload: InitRequest, current_user: dict = Depends(get_current_user)):
+    # Security: ensure the payload user_id matches the authenticated user
+    auth_user_id = str(current_user["_id"])
+    if payload.user_id != auth_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot initialize roadmap for another user")
+
     """
     Idempotent. If a roadmap_progress doc already exists for this user,
     return it unchanged (so re-running onboarding never wipes progress).
@@ -256,7 +262,12 @@ async def init_roadmap(payload: InitRequest):
 
 
 @router.get("/state/{user_id}", response_model=RoadmapProgressState)
-async def get_roadmap_state(user_id: str):
+async def get_roadmap_state(user_id: str, current_user: dict = Depends(get_current_user)):
+    # Security: only allow users to read their own roadmap state
+    auth_user_id = str(current_user["_id"])
+    if user_id != auth_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot access another user's roadmap")
+
     coll = await _get_collection()
     doc = await coll.find_one({"user_id": user_id})
     if not doc:
@@ -275,7 +286,12 @@ async def get_roadmap_state(user_id: str):
 
 
 @router.post("/topic/{topic_id}/checklist", response_model=ChecklistResponse)
-async def update_checklist(topic_id: str, payload: ChecklistRequest):
+async def update_checklist(topic_id: str, payload: ChecklistRequest, current_user: dict = Depends(get_current_user)):
+    # Security: ensure the payload user_id matches the authenticated user
+    auth_user_id = str(current_user["_id"])
+    if payload.user_id != auth_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify another user's checklist")
+
     """
     Update checklist progress for a topic.
 
@@ -316,6 +332,13 @@ async def update_checklist(topic_id: str, payload: ChecklistRequest):
         array_filters=[{"t.topic_id": topic_id}],
     )
 
+    # Trigger adaptive learning profile rebuild
+    try:
+        from app.mentor.intelligence.learning_profile import LearningProfileBuilder
+        await LearningProfileBuilder.build_and_save_profile(payload.user_id)
+    except Exception as exc:
+        logger.error("[CHECKLIST UPDATE] Failed to update learning profile: %s", exc)
+
     logger.info(
         "[CHECKLIST UPDATE] user_id=%s topic_id=%s progress=%d%% (%d/%d) status=%s",
         payload.user_id, topic_id, progress_pct, completed_count, payload.total_subtopics, new_status,
@@ -332,7 +355,12 @@ async def update_checklist(topic_id: str, payload: ChecklistRequest):
 
 
 @router.post("/topic/{topic_id}/complete", response_model=CompleteResponse)
-async def complete_topic(topic_id: str, payload: CompleteRequest):
+async def complete_topic(topic_id: str, payload: CompleteRequest, current_user: dict = Depends(get_current_user)):
+    # Security: ensure the payload user_id matches the authenticated user
+    auth_user_id = str(current_user["_id"])
+    if payload.user_id != auth_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot complete topics for another user")
+
     """
     Mark a topic as completed (progress_pct=100, status=completed, xp awarded)
     and automatically unlock the next topic in roadmap order (if it is
@@ -408,6 +436,13 @@ async def complete_topic(topic_id: str, payload: CompleteRequest):
         )
     else:
         logger.info("[TOPIC UNLOCK] user_id=%s — no further locked topics (roadmap complete or all unlocked)", payload.user_id)
+
+    # Trigger adaptive learning profile rebuild
+    try:
+        from app.mentor.intelligence.learning_profile import LearningProfileBuilder
+        await LearningProfileBuilder.build_and_save_profile(payload.user_id)
+    except Exception as exc:
+        logger.error("[TOPIC COMPLETE] Failed to update learning profile: %s", exc)
 
     final_doc = await coll.find_one({"user_id": payload.user_id})
 

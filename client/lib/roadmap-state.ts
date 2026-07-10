@@ -98,6 +98,18 @@ function getGeneratedRoadmap(): any | null {
 
 // ─── API calls ──────────────────────────────────────────────────────────────
 
+const getAuthHeaders = (extraHeaders: Record<string, string> = {}) => {
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
+
 /**
  * Initialize roadmap_progress in MongoDB from the generated roadmap content.
  * Idempotent — backend no-ops if a roadmap already exists for this user.
@@ -117,16 +129,17 @@ export async function initRoadmap(): Promise<BackendRoadmapState | null> {
   try {
     const res = await fetch(`${API_BASE}/roadmap/init`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ user_id: userId, skill, phases }),
     })
     if (!res.ok) return null
     return await res.json()
   } catch (e) {
-    console.error("[initRoadmap]", e)
+    console.warn("[initRoadmap] Failed to connect or initialize roadmap:", e)
     return null
   }
 }
+
 
 /**
  * Fetch the canonical roadmap progress state from MongoDB.
@@ -137,6 +150,7 @@ export async function fetchRoadmapState(): Promise<BackendRoadmapState | null> {
   try {
     let res = await fetch(`${API_BASE}/roadmap/state/${encodeURIComponent(userId)}`, {
       cache: "no-store",
+      headers: getAuthHeaders(),
     })
 
     if (res.status === 404) {
@@ -148,10 +162,11 @@ export async function fetchRoadmapState(): Promise<BackendRoadmapState | null> {
     if (!res.ok) return null
     return await res.json()
   } catch (e) {
-    console.error("[fetchRoadmapState]", e)
+    console.warn("[fetchRoadmapState] Backend is unavailable or network failed:", e)
     return null
   }
 }
+
 
 /**
  * Mark a topic completed on the backend — unlocks the next topic
@@ -162,7 +177,7 @@ export async function completeTopicOnServer(topicId: string): Promise<BackendRoa
   try {
     const res = await fetch(`${API_BASE}/roadmap/topic/${encodeURIComponent(topicId)}/complete`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ user_id: userId }),
     })
     if (!res.ok) return null
@@ -193,7 +208,7 @@ export async function completeTopicOnServer(topicId: string): Promise<BackendRoa
 
     return data.roadmap as BackendRoadmapState
   } catch (e) {
-    console.error("[completeTopicOnServer]", e)
+    console.warn("[completeTopicOnServer] Backend unavailable or failed to complete topic:", e)
     return null
   }
 }
@@ -208,7 +223,7 @@ export async function updateChecklistOnServer(
   try {
     const res = await fetch(`${API_BASE}/roadmap/topic/${encodeURIComponent(topicId)}/checklist`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         user_id: userId,
         completed_subtopics: completedSubtopics,
@@ -223,10 +238,11 @@ export async function updateChecklistOnServer(
     localStorage.setItem("roadmap_last_updated", Date.now().toString())
     return { progress_pct: data.progress_pct, status: data.status }
   } catch (e) {
-    console.error("[updateChecklistOnServer]", e)
+    console.warn("[updateChecklistOnServer] Backend unavailable or failed to update checklist:", e)
     return null
   }
 }
+
 
 // ─── Derivation: BackendRoadmapState -> ActiveTopicState ──────────────────
 

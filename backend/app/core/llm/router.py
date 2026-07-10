@@ -1,4 +1,4 @@
-﻿"""
+"""
 LLM Provider Router - Tracks AI
 Resolves the correct provider instance for a given task.
 Providers are lazily instantiated and reused (singleton per model).

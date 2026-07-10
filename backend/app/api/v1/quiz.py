@@ -583,6 +583,13 @@ async def submit_quiz(
         except Exception as exc:
             logger.warning("[QUIZ SUBMIT] roadmap_progress update failed: %s", exc)
 
+    # Trigger adaptive learning profile rebuild
+    try:
+        from app.mentor.intelligence.learning_profile import LearningProfileBuilder
+        await LearningProfileBuilder.build_and_save_profile(uid)
+    except Exception as exc:
+        logger.error("[QUIZ SUBMIT] Failed to update learning profile: %s", exc)
+
     logger.info(
         "[QUIZ SUBMIT] user=%s topic=%s score=%.1f%% passed=%s status=%s xp=%d",
         uid, payload.topic_id, score, passed, new_quiz_status, xp_earned,

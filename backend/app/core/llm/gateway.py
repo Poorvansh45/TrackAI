@@ -1,4 +1,4 @@
-﻿"""
+"""
 LLM Gateway - Tracks AI
 ========================
 Fully async. No run_until_complete(), no nested event loops.
