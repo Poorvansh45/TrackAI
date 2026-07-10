@@ -13,6 +13,8 @@ backend/.venv/
 venv/
 .venv/
 
+backend\.env
+
 # Python cache
 **/__pycache__/
 **/*.pyc
@@ -55,3 +57,7 @@ graphify-out/
 venv_files.txt
 
 *.tsbuildinfo
+
+# Vector database
+backend/chromadb_store/
+chromadb_store/
